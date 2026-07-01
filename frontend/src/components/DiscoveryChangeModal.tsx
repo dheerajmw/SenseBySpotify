@@ -18,7 +18,7 @@ export default function DiscoveryChangeModal() {
       aria-labelledby="discovery-change-title"
       aria-modal="true"
     >
-      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950/95 p-8 shadow-2xl backdrop-blur-xl">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950/95 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
         <p className="text-center text-sm text-violet-300">
           ✨ {APP_NAME} has adjusted your Discovery Level.
         </p>

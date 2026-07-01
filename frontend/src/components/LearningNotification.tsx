@@ -9,7 +9,7 @@ export default function LearningNotification() {
 
   return (
     <div
-      className="pointer-events-none fixed right-4 top-24 z-[85] animate-[slide-in-right_0.35s_ease-out]"
+      className="pointer-events-none fixed left-3 right-3 top-[4.5rem] z-[85] mx-auto max-w-sm animate-[slide-in-right_0.35s_ease-out] sm:left-auto sm:right-4 sm:top-24"
       role="status"
       aria-live="polite"
     >

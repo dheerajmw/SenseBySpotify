@@ -5,12 +5,12 @@ export default function Welcome() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.25),_transparent_45%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.18),_transparent_40%)]" />
-      <div className="relative mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-16">
-        <div className="rounded-3xl border border-white/10 bg-zinc-950/60 p-10 shadow-2xl backdrop-blur-xl">
+      <div className="relative mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-4 py-12 sm:px-6 sm:py-16">
+        <div className="rounded-3xl border border-white/10 bg-zinc-950/60 p-6 shadow-2xl backdrop-blur-xl sm:p-8 md:p-10">
           <p className="text-sm uppercase tracking-[0.3em] text-emerald-400">
             Welcome to
           </p>
-          <h1 className="mt-3 bg-gradient-to-r from-white via-emerald-100 to-emerald-300 bg-clip-text text-5xl font-bold text-transparent sm:text-6xl">
+          <h1 className="mt-3 bg-gradient-to-r from-white via-emerald-100 to-emerald-300 bg-clip-text text-4xl font-bold text-transparent sm:text-5xl md:text-6xl">
             {APP_NAME}
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-zinc-300">

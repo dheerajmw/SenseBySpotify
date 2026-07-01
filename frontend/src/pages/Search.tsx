@@ -160,7 +160,7 @@ export default function Search() {
                   setSearchParams({ q: artist.name });
                   setTab("songs");
                 }}
-                className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-left transition hover:border-zinc-700"
+                className="flex min-w-0 items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-left transition hover:border-zinc-700 sm:p-4"
               >
                 {artist.image_url ? (
                   <img
@@ -171,8 +171,8 @@ export default function Search() {
                 ) : (
                   <div className="h-14 w-14 rounded-full bg-zinc-800" />
                 )}
-                <div>
-                  <p className="font-medium">{artist.name}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{artist.name}</p>
                   <p className="text-sm text-zinc-400">View songs</p>
                 </div>
               </button>

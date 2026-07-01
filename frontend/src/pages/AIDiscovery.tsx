@@ -49,11 +49,13 @@ export default function AIDiscovery() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-zinc-800 bg-gradient-to-br from-zinc-900/80 to-emerald-950/20 p-8 backdrop-blur">
+      <section className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900/80 to-emerald-950/20 p-4 backdrop-blur sm:rounded-3xl sm:p-6 md:p-8">
         <p className="text-sm uppercase tracking-widest text-emerald-400">
           {DISCOVER_LABEL}
         </p>
-        <h2 className="mt-2 text-3xl font-semibold">Describe what you want to hear</h2>
+        <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">
+          Describe what you want to hear
+        </h2>
         <p className="mt-4 max-w-2xl text-zinc-400">
           {APP_NAME} uses your taste profile, current intent, and Deezer candidates to
           rank recommendations with clear explanations.

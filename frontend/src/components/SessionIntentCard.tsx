@@ -12,20 +12,20 @@ export default function SessionIntentCard() {
   }
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/40 p-6 shadow-xl shadow-black/30 backdrop-blur-xl">
+    <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/40 p-4 shadow-xl shadow-black/30 backdrop-blur-xl sm:p-6">
       <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-emerald-500/10 blur-2xl" />
       <div className="pointer-events-none absolute -bottom-10 -left-6 h-28 w-28 rounded-full bg-emerald-400/5 blur-2xl" />
 
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-emerald-400/90">
             Your Current Listening Intent
           </p>
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-xl" aria-hidden>
+          <div className="mt-3 flex min-w-0 items-start gap-2">
+            <span className="shrink-0 text-xl" aria-hidden>
               🎧
             </span>
-            <h2 className="text-2xl font-semibold text-white">{intent}</h2>
+            <h2 className="break-words text-xl font-semibold text-white sm:text-2xl">{intent}</h2>
           </div>
           <p className="mt-4 text-sm text-zinc-400">
             Recommendations are currently optimized for your session.

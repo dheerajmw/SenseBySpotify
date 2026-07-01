@@ -7,7 +7,7 @@ export default function DemoModeToggle() {
     <div className="flex shrink-0 items-center gap-2.5 rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1.5">
       <span
         className={[
-          "whitespace-nowrap text-xs font-medium",
+          "hidden whitespace-nowrap text-xs font-medium sm:inline",
           demoMode ? "text-emerald-300" : "text-zinc-500",
         ].join(" ")}
       >

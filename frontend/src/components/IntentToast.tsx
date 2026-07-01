@@ -9,12 +9,12 @@ export default function IntentToast() {
 
   return (
     <div
-      className="fixed bottom-6 left-1/2 z-[90] -translate-x-1/2 animate-[splash-enter_0.3s_ease-out]"
+      className="fixed bottom-[5.5rem] left-1/2 z-[90] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 animate-[splash-enter_0.3s_ease-out] sm:bottom-6 sm:w-auto"
       role="status"
       aria-live="polite"
     >
-      <div className="flex items-center gap-3 rounded-full border border-emerald-500/30 bg-zinc-950/95 px-5 py-3 text-sm text-emerald-100 shadow-xl backdrop-blur">
-        <span>{toastMessage}</span>
+      <div className="flex items-center justify-between gap-3 rounded-full border border-emerald-500/30 bg-zinc-950/95 px-4 py-2.5 text-sm text-emerald-100 shadow-xl backdrop-blur sm:px-5 sm:py-3">
+        <span className="min-w-0 truncate">{toastMessage}</span>
         <button
           type="button"
           onClick={dismissToast}

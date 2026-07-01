@@ -17,7 +17,7 @@ export default function HomeHeroSection({
   const intent = activeIntent.trim();
 
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-950 to-emerald-950/30 p-6 sm:p-8">
+    <section className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-950 to-emerald-950/30 p-4 sm:rounded-3xl sm:p-6 md:p-8">
       <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-emerald-500/10 blur-2xl" />
       <div className="pointer-events-none absolute -bottom-12 -left-8 h-32 w-32 rounded-full bg-emerald-400/5 blur-2xl" />
 
@@ -26,18 +26,22 @@ export default function HomeHeroSection({
           <p className="text-xs font-medium uppercase tracking-widest text-emerald-400">
             Home
           </p>
-          <h2 className="mt-2 text-3xl font-semibold sm:text-4xl">{greeting}</h2>
+          <h2 className="mt-2 break-words text-2xl font-semibold sm:text-3xl md:text-4xl">
+            {greeting}
+          </h2>
 
           {intent ? (
             <div className="mt-4">
               <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-emerald-400/80">
                 Your Current Listening Intent
               </p>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-lg" aria-hidden>
+              <div className="mt-2 flex min-w-0 items-start gap-2">
+                <span className="shrink-0 text-lg" aria-hidden>
                   🎧
                 </span>
-                <p className="text-xl font-semibold text-white sm:text-2xl">{intent}</p>
+                <p className="break-words text-lg font-semibold text-white sm:text-xl md:text-2xl">
+                  {intent}
+                </p>
               </div>
               <p className="mt-2 text-sm text-zinc-400">
                 Recommendations are optimized for this session.

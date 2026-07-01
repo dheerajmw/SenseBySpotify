@@ -155,21 +155,31 @@ export default function Onboarding() {
     );
   }
 
+  function artistKey(artist: Pick<FavouriteArtist, "id" | "name">): string {
+    return `${String(artist.id)}::${artist.name.trim().toLowerCase()}`;
+  }
+
   function toggleArtist(artist: Artist) {
+    const key = artistKey(artist);
     setSelectedArtists((current) => {
-      const exists = current.some((item) => item.id === artist.id);
+      const exists = current.some((item) => artistKey(item) === key);
       if (exists) {
-        return current.filter((item) => item.id !== artist.id);
+        return current.filter((item) => artistKey(item) !== key);
       }
       return [
         ...current,
         {
-          id: artist.id,
+          id: String(artist.id),
           name: artist.name,
           image_url: artist.image_url,
         },
       ];
     });
+  }
+
+  function removeArtist(artist: FavouriteArtist) {
+    const key = artistKey(artist);
+    setSelectedArtists((current) => current.filter((item) => artistKey(item) !== key));
   }
 
   function goNext() {
@@ -192,8 +202,8 @@ export default function Onboarding() {
 
   if (step === "generating") {
     return (
-      <div className="flex min-h-screen items-center justify-center px-6">
-        <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-950/80 p-10 text-center backdrop-blur">
+      <div className="flex min-h-screen items-center justify-center px-4 sm:px-6">
+        <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950/80 p-6 text-center backdrop-blur sm:rounded-3xl sm:p-10">
           <div className="mx-auto h-14 w-14 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-400" />
           <p className="mt-8 text-lg font-medium text-white">
             {GENERATING_MESSAGES[messageIndex]}
@@ -220,8 +230,8 @@ export default function Onboarding() {
         </div>
 
         {step === "genres" && (
-          <section className="rounded-3xl border border-zinc-800 bg-zinc-950/70 p-8 backdrop-blur">
-            <h2 className="text-3xl font-semibold">What do you usually listen to?</h2>
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 backdrop-blur sm:rounded-3xl sm:p-6 md:p-8">
+            <h2 className="text-2xl font-semibold sm:text-3xl">What do you usually listen to?</h2>
             <p className="mt-2 text-zinc-400">Select all genres that fit your taste.</p>
             <div className="mt-8 flex flex-wrap gap-3">
               {GENRE_OPTIONS.map((genre) => {
@@ -247,11 +257,36 @@ export default function Onboarding() {
         )}
 
         {step === "artists" && (
-          <section className="rounded-3xl border border-zinc-800 bg-zinc-950/70 p-8 backdrop-blur">
-            <h2 className="text-3xl font-semibold">Favourite artists</h2>
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 backdrop-blur sm:rounded-3xl sm:p-6 md:p-8">
+            <h2 className="text-2xl font-semibold sm:text-3xl">Favourite artists</h2>
             <p className="mt-2 text-zinc-400">
-              Search and select artists you love.
+              Search and select as many artists as you like.
             </p>
+
+            {selectedArtists.length > 0 && (
+              <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4">
+                <p className="text-xs font-medium uppercase tracking-widest text-emerald-400">
+                  {selectedArtists.length} selected
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedArtists.map((artist) => (
+                    <button
+                      key={artistKey(artist)}
+                      type="button"
+                      onClick={() => removeArtist(artist)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-sm text-emerald-100 transition hover:bg-emerald-500/20"
+                      aria-label={`Remove ${artist.name}`}
+                    >
+                      {artist.name}
+                      <span className="text-emerald-300" aria-hidden>
+                        ×
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <input
               type="search"
               value={artistQuery}
@@ -267,51 +302,59 @@ export default function Onboarding() {
             )}
             <div className="mt-4 space-y-2">
               {artistResults.map((artist) => {
-                const selected = selectedArtists.some((item) => item.id === artist.id);
+                const selected = selectedArtists.some(
+                  (item) => artistKey(item) === artistKey(artist),
+                );
                 return (
                   <button
-                    key={artist.id}
+                    key={artistKey(artist)}
                     type="button"
                     onClick={() => toggleArtist(artist)}
+                    aria-pressed={selected}
                     className={[
                       "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition",
                       selected
-                        ? "border-emerald-500/50 bg-emerald-500/10"
+                        ? "border-emerald-500 bg-emerald-500/10"
                         : "border-zinc-800 hover:border-zinc-700",
                     ].join(" ")}
                   >
+                    <span
+                      className={[
+                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs font-bold",
+                        selected
+                          ? "border-emerald-400 bg-emerald-500 text-black"
+                          : "border-zinc-600 bg-transparent text-transparent",
+                      ].join(" ")}
+                      aria-hidden
+                    >
+                      ✓
+                    </span>
                     {artist.image_url ? (
                       <img
                         src={artist.image_url}
                         alt={artist.name}
-                        className="h-10 w-10 rounded-full object-cover"
+                        className="h-10 w-10 shrink-0 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="h-10 w-10 rounded-full bg-zinc-800" />
+                      <div className="h-10 w-10 shrink-0 rounded-full bg-zinc-800" />
                     )}
-                    <span className="font-medium">{artist.name}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium">{artist.name}</span>
                   </button>
                 );
               })}
             </div>
-            {selectedArtists.length > 0 && (
-              <div className="mt-6 flex flex-wrap gap-2">
-                {selectedArtists.map((artist) => (
-                  <span
-                    key={artist.id}
-                    className="rounded-full bg-zinc-800 px-3 py-1 text-sm text-zinc-200"
-                  >
-                    {artist.name}
-                  </span>
-                ))}
-              </div>
-            )}
+            {artistQuery.trim().length >= 2 &&
+              !artistLoading &&
+              artistResults.length === 0 &&
+              !artistError && (
+                <p className="mt-3 text-sm text-zinc-500">No artists found. Try another search.</p>
+              )}
           </section>
         )}
 
         {step === "style" && (
-          <section className="rounded-3xl border border-zinc-800 bg-zinc-950/70 p-8 backdrop-blur">
-            <h2 className="text-3xl font-semibold">Choose your Discovery Style</h2>
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 backdrop-blur sm:rounded-3xl sm:p-6 md:p-8">
+            <h2 className="text-2xl font-semibold sm:text-3xl">Choose your Discovery Style</h2>
             <p className="mt-2 text-zinc-400">
               How adventurous should Sense be when recommending music?
             </p>
@@ -339,8 +382,8 @@ export default function Onboarding() {
         )}
 
         {step === "intent" && (
-          <section className="rounded-3xl border border-zinc-800 bg-zinc-950/70 p-8 backdrop-blur">
-            <h2 className="text-3xl font-semibold">What are you listening for today?</h2>
+          <section className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-4 backdrop-blur sm:rounded-3xl sm:p-6 md:p-8">
+            <h2 className="text-2xl font-semibold sm:text-3xl">What are you listening for today?</h2>
             <input
               type="text"
               value={currentIntent}

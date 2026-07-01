@@ -147,7 +147,7 @@ export default function RecommendationCard({
           </h3>
           <p className="truncate text-sm text-zinc-400">{artistNames}</p>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <button
               type="button"
               onClick={handlePlay}

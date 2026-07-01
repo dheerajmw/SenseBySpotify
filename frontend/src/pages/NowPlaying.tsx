@@ -50,12 +50,12 @@ export default function NowPlaying() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8">
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-6 md:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm uppercase tracking-widest text-emerald-400">Now Playing</p>
           <div className="flex flex-wrap items-center gap-2">
             {activeIntent && (
-              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
+              <span className="max-w-full truncate rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
                 Intent: {activeIntent}
               </span>
             )}
@@ -90,15 +90,15 @@ export default function NowPlaying() {
             <img
               src={currentTrack.album.image_url}
               alt={currentTrack.album.name}
-              className="h-48 w-48 rounded-2xl object-cover shadow-xl"
+              className="h-36 w-36 rounded-2xl object-cover shadow-xl sm:h-44 sm:w-44 md:h-48 md:w-48"
             />
           ) : (
-            <div className="h-48 w-48 rounded-2xl bg-zinc-800" />
+            <div className="h-36 w-36 rounded-2xl bg-zinc-800 sm:h-44 sm:w-44 md:h-48 md:w-48" />
           )}
 
-          <div className="flex-1 text-center sm:text-left">
-            <h2 className="text-3xl font-semibold">{currentTrack.name}</h2>
-            <p className="mt-2 text-lg text-zinc-400">{artistNames}</p>
+          <div className="min-w-0 flex-1 text-center sm:text-left">
+            <h2 className="break-words text-2xl font-semibold sm:text-3xl">{currentTrack.name}</h2>
+            <p className="mt-2 break-words text-base text-zinc-400 sm:text-lg">{artistNames}</p>
             <p className="mt-1 text-sm text-zinc-500">{currentTrack.album?.name}</p>
 
             <div className="mt-6 flex items-center justify-center gap-4 sm:justify-start">
@@ -182,12 +182,12 @@ export default function NowPlaying() {
                           : "border-zinc-800 bg-zinc-950/40 text-zinc-300 hover:border-zinc-700",
                       ].join(" ")}
                     >
-                      <span>
+                      <span className="min-w-0 flex-1 truncate">
                         <span className="mr-2 text-zinc-500">{index + 1}.</span>
                         {trackLabel(track)}
                       </span>
                       {active && (
-                        <span className="text-xs uppercase tracking-widest text-emerald-300">
+                        <span className="ml-2 shrink-0 text-xs uppercase tracking-widest text-emerald-300">
                           Playing
                         </span>
                       )}

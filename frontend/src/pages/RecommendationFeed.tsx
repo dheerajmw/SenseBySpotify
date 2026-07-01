@@ -138,7 +138,7 @@ export default function RecommendationFeed() {
   }
 
   const gridClass = [
-    "grid gap-4 transition-all duration-500 lg:grid-cols-2",
+    "grid gap-4 transition-all duration-500 sm:grid-cols-2",
     gridPhase === "fading" ? "opacity-0 scale-[0.98]" : "",
     gridPhase === "adapting" ? "opacity-0" : "",
     gridPhase === "entering" ? "animate-feed-enter opacity-100" : "",
@@ -159,13 +159,13 @@ export default function RecommendationFeed() {
       <DiscoveryLevelCard />
       <WhyRecommendationsChangedCard />
 
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-sm uppercase tracking-widest text-emerald-400">
               Recommendation Feed
             </p>
-            <h2 className="mt-2 text-2xl font-semibold">
+            <h2 className="mt-2 break-words text-xl font-semibold sm:text-2xl">
               {query ? `Results for “${query}”` : "Your recommendations"}
             </h2>
             <p className="mt-2 text-sm text-zinc-400">

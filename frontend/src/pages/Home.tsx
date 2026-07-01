@@ -51,7 +51,7 @@ export default function Home() {
     : "Welcome back";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       <HomeHeroSection greeting={greeting} activeIntent={activeIntent} />
       <DiscoveryLevelCard />
       <WhyRecommendationsChangedCard />
@@ -82,13 +82,18 @@ export default function Home() {
 
       {showRecommendations && (
         <section className="space-y-4" key={session.recommendationVersion}>
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">Recommended for {activeIntent}</h3>
-            <Link to="/feed" className="text-sm text-emerald-300 hover:text-emerald-200">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="min-w-0 flex-1 break-words text-lg font-semibold sm:text-xl">
+              Recommended for {activeIntent}
+            </h3>
+            <Link
+              to="/feed"
+              className="shrink-0 text-sm text-emerald-300 hover:text-emerald-200"
+            >
               View feed
             </Link>
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {recommendations.slice(0, 4).map((item) => (
               <RecommendationCard
                 key={item.track.id}
@@ -122,7 +127,7 @@ export default function Home() {
       {feedMatchesIntent && history.length > 0 && !isRegeneratingFeed && (
         <section className="space-y-4" key={`history-${session.recommendationVersion}`}>
           <h3 className="text-xl font-semibold">Recently Recommended</h3>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {history.slice(0, 4).map((item) => (
               <RecommendationCard
                 key={`${item.track.id}-${item.rank}`}
