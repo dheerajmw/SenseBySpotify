@@ -119,10 +119,14 @@ export interface SessionAction {
 
 export interface SessionState {
   currentIntent: string;
+  candidateIntent: string;
+  intentConfidence: number;
   preferredArtists: string[];
   discoveryLevel: number;
   discoveryLabel: string;
   confidence: number;
+  interactionsCollected: number;
+  explicitPreferenceSignals: number;
   recentActions: SessionAction[];
   lastUpdated: string;
   recommendationVersion: number;

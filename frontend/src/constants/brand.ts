@@ -41,7 +41,7 @@ export const FEED_STORAGE_KEY = "sense_feed";
 export const HISTORY_STORAGE_KEY = "sense_recommendation_history";
 export const SESSION_STORAGE_KEY = "sense_session";
 
-export const SESSION_ACTIONS_THRESHOLD = 2;
-export const SESSION_DEBOUNCE_MS = 10_000;
+export const SESSION_ACTIONS_THRESHOLD = 5;
+export const SESSION_DEBOUNCE_MS = 60_000;
 export const DEMO_MODE_STORAGE_KEY = "sense_demo_mode";
 export const AUTOPLAY_STORAGE_KEY = "sense_autoplay";

@@ -1,5 +1,11 @@
 import { useState } from "react";
 import { useSession } from "../hooks/useSession";
+import {
+  EXPLICIT_PREFERENCE_SIGNALS_TARGET,
+  INTENT_CONFIDENCE_THRESHOLD,
+  MEANINGFUL_INTERACTIONS_TARGET,
+  remainingInteractionsNeeded,
+} from "../utils/intentEvidence";
 
 function formatTime(timestamp: number): string {
   const date = new Date(timestamp);
@@ -62,6 +68,11 @@ export default function SessionDebugger() {
 
   const latestIntent = intentHistory.at(-1);
   const earlierIntents = intentHistory.slice(0, -1).reverse();
+  const remaining = remainingInteractionsNeeded(session.interactionsCollected);
+  const candidateDiffers =
+    session.candidateIntent.trim() !== "" &&
+    session.candidateIntent.trim().toLowerCase() !==
+      session.currentIntent.trim().toLowerCase();
 
   if (!import.meta.env.DEV) {
     return null;
@@ -104,13 +115,66 @@ export default function SessionDebugger() {
               </button>
             </div>
 
-            <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
-              <div className="rounded-xl bg-zinc-900 px-4 py-3">
-                <dt className="text-zinc-500">Current Intent</dt>
-                <dd className="mt-1 font-medium text-white">
-                  {session.currentIntent || "—"}
-                </dd>
-              </div>
+            <section className="mt-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-emerald-400">
+                Intent Evidence
+              </h3>
+              <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-zinc-500">Current Intent</dt>
+                  <dd className="mt-0.5 font-medium text-white">
+                    {session.currentIntent || "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Candidate Intent</dt>
+                  <dd
+                    className={[
+                      "mt-0.5 font-medium",
+                      candidateDiffers ? "text-amber-300" : "text-zinc-300",
+                    ].join(" ")}
+                  >
+                    {session.candidateIntent || session.currentIntent || "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Intent Confidence</dt>
+                  <dd className="mt-0.5 font-medium text-white">
+                    {session.intentConfidence}%
+                    {isCheckingIntent ? " · evaluating..." : ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Threshold</dt>
+                  <dd className="mt-0.5 font-medium text-white">
+                    {INTENT_CONFIDENCE_THRESHOLD}%
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Evidence</dt>
+                  <dd className="mt-0.5 font-medium text-white">
+                    {session.interactionsCollected} / {MEANINGFUL_INTERACTIONS_TARGET}{" "}
+                    interactions
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Preference Signals</dt>
+                  <dd className="mt-0.5 font-medium text-white">
+                    {session.explicitPreferenceSignals} / {EXPLICIT_PREFERENCE_SIGNALS_TARGET}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-zinc-500">Remaining Interactions Needed</dt>
+                  <dd className="mt-0.5 font-medium text-white">
+                    {remaining > 0
+                      ? `${remaining} more meaningful interaction${remaining === 1 ? "" : "s"}`
+                      : "Evaluation threshold met"}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <div className="rounded-xl bg-zinc-900 px-4 py-3">
                 <dt className="text-zinc-500">Discovery Level</dt>
                 <dd className="mt-1 font-medium text-white">
@@ -118,10 +182,9 @@ export default function SessionDebugger() {
                 </dd>
               </div>
               <div className="rounded-xl bg-zinc-900 px-4 py-3">
-                <dt className="text-zinc-500">Confidence</dt>
+                <dt className="text-zinc-500">AI Model Confidence</dt>
                 <dd className="mt-1 font-medium text-white">
                   {Math.round(session.confidence * 100)}%
-                  {isCheckingIntent ? " · checking..." : ""}
                 </dd>
               </div>
               <div className="rounded-xl bg-zinc-900 px-4 py-3 sm:col-span-2">
@@ -140,7 +203,7 @@ export default function SessionDebugger() {
               <h3 className="text-sm font-medium text-zinc-300">Intent Timeline</h3>
 
               {!latestIntent && (
-                <p className="mt-3 text-sm text-zinc-500">No intent updates yet.</p>
+                <p className="mt-3 text-sm text-zinc-500">No intent changes yet.</p>
               )}
 
               {latestIntent && (
