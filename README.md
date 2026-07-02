@@ -1,6 +1,6 @@
 # Sense
 
-AI-powered music discovery that understands your listening intent. Built with React, FastAPI, Deezer Search API, and OpenAI.
+AI-powered music discovery that understands your listening intent. Built with React, FastAPI, iTunes Search API, and OpenAI.
 
 ## Quick start
 
@@ -28,9 +28,9 @@ Open **http://127.0.0.1:5173**
 ## App flow
 
 1. **Welcome** — Get Started
-2. **Onboarding** — Genres → Artists (Deezer search) → Discovery style → Intent
+2. **Onboarding** — Genres → Artists (iTunes search) → Discovery style → Intent
 3. **Home** — Greeting, recommendations, trending, history
-4. **AI Discovery** — Natural-language prompt → Deezer candidates → OpenAI ranking
+4. **AI Discovery** — Natural-language prompt → iTunes candidates → OpenAI ranking
 5. **Feed** — Recommendation cards with preview, explanations, and local feedback
 
 ## API
@@ -38,8 +38,8 @@ Open **http://127.0.0.1:5173**
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Health check |
-| `GET` | `/search/artists?q=` | Deezer artist search |
-| `GET` | `/search?q=` | Deezer track search |
+| `GET` | `/search/artists?q=` | iTunes artist search |
+| `GET` | `/search?q=` | iTunes track search |
 | `POST` | `/generate-recommendations` | Profile + intent → ranked recommendations |
 
 No authentication required. User profile and feedback are stored in browser `localStorage`.
@@ -64,6 +64,6 @@ VITE_API_BASE_URL=/api
 
 - **Frontend:** React, TypeScript, Tailwind, Vite
 - **Backend:** FastAPI
-- **Music:** Deezer API (no API key required)
+- **Music:** iTunes Search API (no API key required)
 - **AI:** OpenAI
 - **Storage:** localStorage (MVP)

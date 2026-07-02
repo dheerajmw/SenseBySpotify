@@ -1,0 +1,266 @@
+export const VALID_INTENTS = [
+  "Focus",
+  "Workout",
+  "Driving",
+  "Relaxing",
+  "Study",
+  "Party",
+  "Travel",
+  "Sleep",
+  "Romantic",
+  "Morning",
+  "Late Night",
+  "Meditation",
+  "Coding",
+  "Reading",
+  "Rainy Evening",
+  "Road Trip",
+  "Festival",
+  "High Energy",
+  "Calm",
+  "Happy",
+  "Melancholic",
+] as const;
+
+export type ValidIntent = (typeof VALID_INTENTS)[number];
+
+const VALID_INTENT_LOOKUP = new Map(
+  VALID_INTENTS.map((intent) => [intent.toLowerCase(), intent]),
+);
+
+const GENRE_LABELS = new Set(
+  [
+    "pop",
+    "bollywood",
+    "indie",
+    "rock",
+    "hip hop",
+    "lo-fi",
+    "lofi",
+    "jazz",
+    "edm",
+    "classical",
+    "punjabi",
+    "acoustic",
+    "alternative",
+    "metal",
+    "country",
+    "r&b",
+    "soul",
+    "blues",
+    "folk",
+    "reggae",
+    "latin",
+    "k-pop",
+    "techno",
+    "house",
+    "trap",
+  ],
+);
+
+const DISCOVERY_LABELS = new Set(
+  [
+    "discovery",
+    "balanced explorer",
+    "mostly familiar",
+    "adventurous explorer",
+    "discovery enthusiast",
+    "new artist",
+    "new discovery",
+    "new discoveries",
+    "familiar music",
+    "balanced",
+    "adventurous",
+  ],
+);
+
+const KNOWN_ARTISTS = new Set(
+  [
+    "coldplay",
+    "taylor swift",
+    "arijit singh",
+    "prateek kuhad",
+    "imagine dragons",
+    "eminem",
+    "ed sheeran",
+    "the weeknd",
+    "drake",
+    "billie eilish",
+    "talha anjum",
+  ],
+);
+
+const MOOD_KEYWORD_TO_INTENT: Record<string, ValidIntent> = {
+  workout: "Workout",
+  gym: "Workout",
+  focus: "Focus",
+  study: "Study",
+  coding: "Coding",
+  code: "Coding",
+  driving: "Driving",
+  drive: "Driving",
+  "road trip": "Road Trip",
+  relaxing: "Relaxing",
+  relax: "Relaxing",
+  chill: "Calm",
+  calm: "Calm",
+  party: "Party",
+  romance: "Romantic",
+  romantic: "Romantic",
+  rain: "Rainy Evening",
+  rainy: "Rainy Evening",
+  "late night": "Late Night",
+  night: "Late Night",
+  sleep: "Sleep",
+  travel: "Travel",
+  morning: "Morning",
+  energy: "High Energy",
+  energetic: "High Energy",
+  happy: "Happy",
+  sad: "Melancholic",
+  melanchol: "Melancholic",
+  meditat: "Meditation",
+  festival: "Festival",
+  reading: "Reading",
+  read: "Reading",
+  poetry: "Reading",
+  poem: "Reading",
+  nazm: "Reading",
+  ghazal: "Melancholic",
+  shayari: "Melancholic",
+  urdu: "Melancholic",
+  sufi: "Meditation",
+};
+
+export interface IntentValidationResult {
+  accepted: boolean;
+  intent: string;
+  intentChanged: boolean;
+  rejectionReason: string | null;
+  preferredArtists: string[];
+  preferredGenres: string[];
+}
+
+function normalize(value: string): string {
+  return value.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+export function canonicalIntent(value: string): ValidIntent | null {
+  const normalized = normalize(value);
+  const direct = VALID_INTENT_LOOKUP.get(normalized);
+  return direct ?? null;
+}
+
+export function isValidIntent(value: string): boolean {
+  return canonicalIntent(value) !== null;
+}
+
+export function isGenreLabel(value: string): boolean {
+  return GENRE_LABELS.has(normalize(value));
+}
+
+export function isDiscoveryLabel(value: string): boolean {
+  return DISCOVERY_LABELS.has(normalize(value));
+}
+
+export function isKnownArtist(value: string, extraArtists: string[] = []): boolean {
+  const normalized = normalize(value);
+  if (KNOWN_ARTISTS.has(normalized)) {
+    return true;
+  }
+  return extraArtists.some((artist) => normalize(artist) === normalized);
+}
+
+export function extractIntentFromText(text: string): ValidIntent | null {
+  const normalized = normalize(text);
+  const direct = canonicalIntent(text);
+  if (direct) {
+    return direct;
+  }
+
+  const sorted = Object.entries(MOOD_KEYWORD_TO_INTENT).sort(
+    (a, b) => b[0].length - a[0].length,
+  );
+  for (const [keyword, intent] of sorted) {
+    if (normalized.includes(keyword)) {
+      return intent;
+    }
+  }
+  return null;
+}
+
+export function validateProposedIntent(
+  proposed: string,
+  currentIntent: string,
+  knownArtists: string[] = [],
+): IntentValidationResult {
+  const cleaned = proposed.trim();
+  if (!cleaned) {
+    return {
+      accepted: false,
+      intent: currentIntent,
+      intentChanged: false,
+      rejectionReason: "Empty intent proposal.",
+      preferredArtists: [],
+      preferredGenres: [],
+    };
+  }
+
+  if (isDiscoveryLabel(cleaned)) {
+    return {
+      accepted: false,
+      intent: currentIntent,
+      intentChanged: false,
+      rejectionReason: "Discovery Level cannot become Session Intent.",
+      preferredArtists: [],
+      preferredGenres: [],
+    };
+  }
+
+  if (isGenreLabel(cleaned)) {
+    return {
+      accepted: false,
+      intent: currentIntent,
+      intentChanged: false,
+      rejectionReason: "Genre labels cannot become Session Intent.",
+      preferredArtists: [],
+      preferredGenres: [cleaned],
+    };
+  }
+
+  if (isKnownArtist(cleaned, knownArtists)) {
+    return {
+      accepted: false,
+      intent: currentIntent,
+      intentChanged: false,
+      rejectionReason: "Artist names cannot become Session Intent.",
+      preferredArtists: [cleaned],
+      preferredGenres: [],
+    };
+  }
+
+  const canonical = canonicalIntent(cleaned) ?? extractIntentFromText(cleaned);
+  if (!canonical) {
+    return {
+      accepted: false,
+      intent: currentIntent,
+      intentChanged: false,
+      rejectionReason: `Invalid AI intent ignored: '${cleaned}' is not in the allowed intent list.`,
+      preferredArtists: [],
+      preferredGenres: [],
+    };
+  }
+
+  return {
+    accepted: true,
+    intent: canonical,
+    intentChanged: normalize(canonical) !== normalize(currentIntent),
+    rejectionReason: null,
+    preferredArtists: [],
+    preferredGenres: [],
+  };
+}
+
+export function mapSearchToCandidateIntent(query: string): ValidIntent | null {
+  return extractIntentFromText(query);
+}

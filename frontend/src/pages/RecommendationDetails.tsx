@@ -29,7 +29,7 @@ export default function RecommendationDetails() {
     setFeed(response);
   }, [profile, query, setFeed]);
 
-  const { sendFeedback } = useFeedback(regenerate);
+  const { sendFeedback, toggleLike, toggleDislike } = useFeedback(regenerate);
   const { logAction } = useSession();
 
   useEffect(() => {
@@ -61,6 +61,8 @@ export default function RecommendationDetails() {
   const { track, reason, confidence, rank } = recommendation;
   const bullets = parseReasonBullets(reason);
   const label = trackLabel(track);
+  const isLiked = profile.likedTrackIds.includes(track.id);
+  const isDisliked = profile.dislikedTrackIds.includes(track.id);
 
   const playing = isTrackPlaying(track.id);
 
@@ -70,6 +72,18 @@ export default function RecommendationDetails() {
       return;
     }
     playTrack(track);
+  }
+
+  function handleLikeClick() {
+    if (isLiked) {
+      void toggleLike(track.id, label);
+      return;
+    }
+    setShowLikePopup(true);
+  }
+
+  function handleDislikeClick() {
+    void toggleDislike(track.id, label);
   }
 
   async function handleLikeSubmit(chips: FeedbackChip[]) {
@@ -167,10 +181,29 @@ export default function RecommendationDetails() {
               </Link>
               <button
                 type="button"
-                onClick={() => setShowLikePopup(true)}
-                className="rounded-full border border-emerald-500/40 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-500/10"
+                onClick={handleLikeClick}
+                aria-pressed={isLiked}
+                className={[
+                  "rounded-full border px-4 py-2 text-sm transition",
+                  isLiked
+                    ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
+                    : "border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10",
+                ].join(" ")}
               >
-                Like
+                {isLiked ? "Unlike" : "Like"}
+              </button>
+              <button
+                type="button"
+                onClick={handleDislikeClick}
+                aria-pressed={isDisliked}
+                className={[
+                  "rounded-full border px-4 py-2 text-sm transition",
+                  isDisliked
+                    ? "border-rose-500/50 bg-rose-500/15 text-rose-300"
+                    : "border-rose-500/40 text-rose-300 hover:bg-rose-500/10",
+                ].join(" ")}
+              >
+                {isDisliked ? "Remove dislike" : "Dislike"}
               </button>
               {track.external_url && (
                 <a

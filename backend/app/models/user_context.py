@@ -14,6 +14,9 @@ class FeedbackEventType(str, Enum):
     SEARCH = "search"
     COMPLETE = "complete"
     LIKE = "like"
+    UNLIKE = "unlike"
+    DISLIKE = "dislike"
+    UNDISLIKE = "undislike"
 
 
 class FeedbackChip(str, Enum):

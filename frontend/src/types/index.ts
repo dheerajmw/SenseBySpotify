@@ -19,11 +19,15 @@ export interface Track {
   name: string;
   artists: Artist[];
   album: Album | null;
+  primary_genre: string | null;
   duration_ms: number | null;
   preview_url: string | null;
   external_url: string | null;
   popularity: number | null;
 }
+
+/** Whether autoplay should chain through the queue or refresh from session intent. */
+export type QueueSource = "intent" | "search";
 
 export interface FavouriteArtist {
   id: string;
@@ -39,6 +43,7 @@ export interface LocalUserProfile {
   onboardingCompleted: boolean;
   feedbackEvents: FeedbackEvent[];
   likedTrackIds: string[];
+  dislikedTrackIds: string[];
 }
 
 export interface SearchResponse {
@@ -66,7 +71,7 @@ export interface Recommendation {
   confidence: number;
 }
 
-export type FeedbackEventType = "like" | "skip" | "replay";
+export type FeedbackEventType = "like" | "unlike" | "dislike" | "undislike" | "skip" | "replay";
 
 export type FeedbackChip =
   | "mood"
@@ -105,7 +110,10 @@ export type SessionActionType =
   | "SEARCH_ARTIST"
   | "SEARCH"
   | "PLAY"
+  | "LISTENED_20S"
   | "LIKE"
+  | "UNLIKE"
+  | "DISLIKE"
   | "SKIP"
   | "REPLAY"
   | "RECOMMENDATION_CLICKED"
@@ -117,20 +125,49 @@ export interface SessionAction {
   timestamp: number;
 }
 
+/** Parallel mood hypothesis from manual search — separate from feed/listening candidate. */
+export interface SearchCandidate {
+  intent: string;
+  confidence: number;
+  query: string;
+  lastActiveAt: string;
+}
+
 export interface SessionState {
+  sessionId: string;
+  createdAt: string;
+  lastActive: string;
   currentIntent: string;
   candidateIntent: string;
   intentConfidence: number;
+  searchCandidate: SearchCandidate | null;
+  lastSearchQuery: string | null;
   preferredArtists: string[];
+  preferredGenres: string[];
   discoveryLevel: number;
   discoveryLabel: string;
   confidence: number;
   interactionsCollected: number;
   explicitPreferenceSignals: number;
   recentActions: SessionAction[];
+  currentQueue: Track[];
+  currentQueueIndex: number;
   lastUpdated: string;
   recommendationVersion: number;
   aiReason: string;
+  intentDecision: string;
+  lastIntentValidation: IntentValidationDebug | null;
+  personalizedSecondSongUsed: boolean;
+  listeningShiftIntent: string | null;
+  listeningShiftPlayCount: number;
+}
+
+export interface IntentValidationDebug {
+  rawAiOutput: Record<string, unknown> | null;
+  parsedOutput: Record<string, unknown> | null;
+  validationStatus: "accepted" | "rejected" | "pending";
+  validationMessage: string | null;
+  rawNewIntent: string | null;
 }
 
 export interface IntentHistoryEntry {
@@ -144,6 +181,10 @@ export interface UpdateSessionIntentResponse {
   intent_changed: boolean;
   new_intent: string;
   preferred_artists: string[];
+  preferred_genres: string[];
   confidence: number;
   reason: string;
+  validation_status?: "accepted" | "rejected";
+  validation_message?: string | null;
+  raw_new_intent?: string | null;
 }

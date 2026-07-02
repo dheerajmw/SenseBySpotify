@@ -10,7 +10,9 @@ import WhyRecommendationsChangedCard from "../components/WhyRecommendationsChang
 import { useProfile } from "../contexts/ProfileContext";
 import { useRecommendations } from "../contexts/RecommendationsContext";
 import { useFeedback } from "../hooks/useFeedback";
+import { useSkipRecommendation } from "../hooks/useSkipRecommendation";
 import { useSession } from "../hooks/useSession";
+import { getActiveIntent } from "../utils/sessionLifecycle";
 import type { FeedbackChip, Recommendation } from "../types";
 
 export default function RecommendationFeed() {
@@ -34,20 +36,24 @@ export default function RecommendationFeed() {
   const isUpdating = refreshing || isRegeneratingFeed;
 
   const regenerate = useCallback(async () => {
-    const intent = session.currentIntent || profile.currentIntent || query;
+    const intent = getActiveIntent(session) || query;
     if (!intent) {
       return;
     }
     setRefreshing(true);
     try {
-      const response = await api.generateRecommendations(profile, intent);
+      const response = await api.generateRecommendations(
+        { ...profile, currentIntent: intent },
+        intent,
+      );
       setFeed(response);
     } finally {
       setRefreshing(false);
     }
-  }, [profile, query, session.currentIntent, setFeed]);
+  }, [profile, query, session, setFeed]);
 
-  const { sendFeedback } = useFeedback(regenerate);
+  const { sendFeedback, toggleLike, toggleDislike } = useFeedback(regenerate);
+  const { skipRecommendation } = useSkipRecommendation();
 
   useEffect(() => {
     if (isRegeneratingFeed) {
@@ -75,7 +81,21 @@ export default function RecommendationFeed() {
   }, [isRegeneratingFeed, refreshing, recommendations, gridPhase]);
 
   async function handleLike(recommendation: Recommendation) {
+    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
+    if (profile.likedTrackIds.includes(recommendation.track.id)) {
+      await toggleLike(recommendation.track.id, label);
+      return;
+    }
     setPendingLike(recommendation);
+  }
+
+  async function handleDislike(recommendation: Recommendation) {
+    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
+    const wasDisliked = profile.dislikedTrackIds.includes(recommendation.track.id);
+    await toggleDislike(recommendation.track.id, label);
+    if (!wasDisliked) {
+      await skipRecommendation(recommendation);
+    }
   }
 
   async function handleLikeDismiss() {
@@ -112,12 +132,7 @@ export default function RecommendationFeed() {
   }
 
   async function handleSkip(recommendation: Recommendation) {
-    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
-    await sendFeedback({
-      track_id: recommendation.track.id,
-      event_type: "skip",
-      track_label: label,
-    });
+    await skipRecommendation(recommendation);
   }
 
   if (!hasFeed) {
@@ -226,6 +241,7 @@ export default function RecommendationFeed() {
                 <RecommendationCard
                   recommendation={recommendation}
                   onLike={(item) => void handleLike(item)}
+                  onDislike={(item) => void handleDislike(item)}
                   onSkip={(item) => void handleSkip(item)}
                 />
               </div>

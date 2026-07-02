@@ -33,6 +33,7 @@ interface RecommendationsContextValue {
   trending: Track[];
   setFeed: (response: GenerateRecommendationsResponse) => void;
   getRecommendation: (trackId: string) => Recommendation | undefined;
+  removeRecommendation: (trackId: string) => void;
   clearFeed: () => void;
 }
 
@@ -130,6 +131,26 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
     [recommendations],
   );
 
+  const removeRecommendation = useCallback((trackId: string) => {
+    setRecommendations((current) => {
+      const next = current
+        .filter((item) => item.track.id !== trackId)
+        .map((item, index) => ({ ...item, rank: index + 1 }));
+      if (next.length === current.length) {
+        return current;
+      }
+      if (query) {
+        persistFeed({
+          query,
+          recommendations: next,
+          candidateCount,
+          usedAi,
+        });
+      }
+      return next;
+    });
+  }, [query, candidateCount, usedAi]);
+
   const clearFeed = useCallback(() => {
     setQuery(null);
     setRecommendations([]);
@@ -149,6 +170,7 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
       trending,
       setFeed,
       getRecommendation,
+      removeRecommendation,
       clearFeed,
     }),
     [
@@ -160,6 +182,7 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
       trending,
       setFeed,
       getRecommendation,
+      removeRecommendation,
       clearFeed,
     ],
   );

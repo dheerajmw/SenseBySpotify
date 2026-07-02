@@ -17,3 +17,22 @@ class GenerateRecommendationsResponse(BaseModel):
     recommendations: list[Recommendation]
     candidate_count: int
     used_ai: bool
+
+
+class LastTrackPayload(BaseModel):
+    id: str
+    name: str
+    artist: str
+
+
+class RecommendFromLastTrackRequest(BaseModel):
+    profile: UserProfilePayload
+    last_track: LastTrackPayload
+    query: str = Field(default="", max_length=500)
+
+
+class RecommendFromLastTrackResponse(BaseModel):
+    query: str
+    recommendation: Recommendation | None
+    candidate_count: int
+    used_ai: bool

@@ -107,6 +107,7 @@ export default function Onboarding() {
       setSessionIntent(intent, {
         reason: "Initial intent from onboarding profile.",
         bumpVersion: true,
+        userDeclared: true,
       });
       await setDiscoveryLevel(noveltyTolerance, { regenerate: false });
 

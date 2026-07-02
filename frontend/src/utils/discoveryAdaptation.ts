@@ -10,10 +10,13 @@ export function computeDiscoveryAdjustment(
   value: string,
   favouriteArtistNames: string[],
 ): DiscoveryAdjustment | null {
-  if (type === "SKIP") {
+  if (type === "SKIP" || type === "DISLIKE") {
     return {
       delta: -7,
-      reason: "You've recently preferred familiar artists over new discoveries.",
+      reason:
+        type === "DISLIKE"
+          ? "You disliked a recommendation — showing more familiar picks."
+          : "You've recently preferred familiar artists over new discoveries.",
     };
   }
 

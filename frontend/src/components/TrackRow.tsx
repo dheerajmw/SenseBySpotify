@@ -1,5 +1,5 @@
 import { usePlayer } from "../contexts/PlayerContext";
-import type { Track } from "../types";
+import type { QueueSource, Track } from "../types";
 import { formatDuration } from "../utils/music";
 import { trackLabel } from "../utils/track";
 
@@ -7,6 +7,7 @@ interface TrackRowProps {
   track: Track;
   index?: number;
   queue?: Track[];
+  queueSource?: QueueSource;
   onPlay?: (track: Track) => void;
   showIndex?: boolean;
 }
@@ -32,6 +33,7 @@ export default function TrackRow({
   track,
   index,
   queue,
+  queueSource = "search",
   onPlay,
   showIndex = false,
 }: TrackRowProps) {
@@ -45,7 +47,15 @@ export default function TrackRow({
       return;
     }
     onPlay?.(track);
-    playTrack(track, queue ? { queue, startIndex: queue.findIndex((t) => t.id === track.id) } : undefined);
+    if (queue?.length) {
+      playTrack(track, {
+        queue,
+        startIndex: queue.findIndex((t) => t.id === track.id),
+        queueSource,
+      });
+      return;
+    }
+    playTrack(track, { queueSource: "intent" });
   }
 
   return (

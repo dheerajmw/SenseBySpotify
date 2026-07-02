@@ -1,29 +1,23 @@
 from __future__ import annotations
 
+from app.services.valid_intents import canonical_intent, is_valid_intent, normalize_text
 from app.services.session_intent_validation import (
     classify_search_signal,
     extract_artists_from_play_label,
+    extract_intent_from_text,
     merge_preferred_artists,
+    merge_preferred_genres,
 )
 
 SEARCH_TYPES = {"SEARCH", "SEARCH_TRACK", "SEARCH_ARTIST"}
 
 
-def _normalize(text: str) -> str:
-    return " ".join(text.lower().strip().split())
-
-
 def _intent_matches(current_intent: str, query: str) -> bool:
-    current = _normalize(current_intent)
-    query_norm = _normalize(query)
-    if not query_norm:
-        return True
-    if not current:
+    current = canonical_intent(current_intent) or current_intent
+    candidate = extract_intent_from_text(query) or canonical_intent(query)
+    if not candidate:
         return False
-    if query_norm in current or current in query_norm:
-        return True
-    query_words = [word for word in query_norm.split() if len(word) > 2]
-    return any(word in current for word in query_words)
+    return normalize_text(current) == normalize_text(candidate)
 
 
 def _recent_searches(recent_actions: list[dict]) -> list[dict]:
@@ -50,16 +44,7 @@ def _recent_plays(recent_actions: list[dict]) -> list[str]:
     ]
 
 
-ROMANTIC_SIGNALS = {
-    "romance",
-    "romantic",
-    "love",
-    "heart",
-    "mohabbat",
-    "ishq",
-    "pyaar",
-    "dil",
-}
+ROMANTIC_SIGNALS = {"romance", "romantic", "love", "heart", "mohabbat", "ishq", "pyaar", "dil"}
 
 
 def _plays_suggest_theme(plays: list[str], signals: set[str]) -> int:
@@ -76,16 +61,19 @@ def infer_intent_from_actions(
     recent_actions: list[dict],
     *,
     profile_artists: list[str] | None = None,
+    profile_genres: list[str] | None = None,
 ) -> dict | None:
-    """Detect clear intent shifts from search/play patterns without relying on the LLM."""
+    """Conservative rule-based hints. Never maps artists/genres/discovery to intent."""
     if not recent_actions:
         return None
 
     artists = profile_artists or []
+    genres = profile_genres or []
     plays = _recent_plays(recent_actions)
     searches = _recent_searches(recent_actions)
 
     preferred_artists: list[str] = []
+    preferred_genres: list[str] = list(genres)
     for play in plays[:6]:
         preferred_artists = merge_preferred_artists(
             preferred_artists,
@@ -94,22 +82,24 @@ def infer_intent_from_actions(
 
     if not searches:
         romantic_plays = _plays_suggest_theme(plays, ROMANTIC_SIGNALS)
-        if romantic_plays >= 2 and not _intent_matches(current_intent, "romantic"):
+        if romantic_plays >= 3 and not _intent_matches(current_intent, "romantic"):
             return {
                 "intent_changed": True,
                 "new_intent": "Romantic",
                 "preferred_artists": preferred_artists,
+                "preferred_genres": preferred_genres,
                 "confidence": 0.84,
                 "reason": (
                     f"User played {romantic_plays} romantic tracks, "
-                    f"shifting away from '{current_intent or 'their previous mood'}'."
+                    f"suggesting a shift from '{current_intent or 'their previous mood'}'."
                 ),
             }
-        if preferred_artists:
+        if preferred_artists or preferred_genres:
             return {
                 "intent_changed": False,
                 "new_intent": current_intent,
                 "preferred_artists": preferred_artists,
+                "preferred_genres": preferred_genres,
                 "confidence": 0.7,
                 "reason": "Captured recent artist preferences from playback.",
             }
@@ -127,21 +117,46 @@ def infer_intent_from_actions(
         preferred_artists,
         classified["preferred_artists"],
     )
+    preferred_genres = merge_preferred_genres(
+        preferred_genres,
+        classified["preferred_genres"],
+    )
 
-    if not candidate_intent or _intent_matches(current_intent, candidate_intent):
-        if preferred_artists:
+    if classified["preferred_artists"] and not candidate_intent:
+        return {
+            "intent_changed": False,
+            "new_intent": current_intent,
+            "preferred_artists": preferred_artists,
+            "preferred_genres": preferred_genres,
+            "confidence": 0.72,
+            "reason": "Updated preferred artists without changing listening context.",
+        }
+
+    if not candidate_intent or not is_valid_intent(candidate_intent):
+        if preferred_artists or preferred_genres:
             return {
                 "intent_changed": False,
                 "new_intent": current_intent,
                 "preferred_artists": preferred_artists,
+                "preferred_genres": preferred_genres,
                 "confidence": 0.72,
-                "reason": "Updated preferred artists without changing listening context.",
+                "reason": "Updated preferences without changing listening context.",
             }
         return None
 
-    latest_norm = _normalize(latest_query)
+    if _intent_matches(current_intent, candidate_intent):
+        return {
+            "intent_changed": False,
+            "new_intent": current_intent,
+            "preferred_artists": preferred_artists,
+            "preferred_genres": preferred_genres,
+            "confidence": 0.72,
+            "reason": "Recent activity aligns with the current listening intent.",
+        }
+
+    latest_norm = normalize_text(latest_query)
     matching_searches = sum(
-        1 for item in searches[:8] if _normalize(item["value"]) == latest_norm
+        1 for item in searches[:8] if normalize_text(item["value"]) == latest_norm
     )
 
     if matching_searches >= 2:
@@ -149,39 +164,22 @@ def infer_intent_from_actions(
             "intent_changed": True,
             "new_intent": candidate_intent,
             "preferred_artists": preferred_artists,
+            "preferred_genres": preferred_genres,
             "confidence": 0.9,
             "reason": (
                 f"User searched for '{latest_query}' multiple times, "
-                f"shifting listening context to '{candidate_intent}'."
+                f"suggesting '{candidate_intent}' as the new listening context."
             ),
         }
 
-    if matching_searches >= 1 and plays:
-        return {
-            "intent_changed": True,
-            "new_intent": candidate_intent,
-            "preferred_artists": preferred_artists,
-            "confidence": 0.82,
-            "reason": (
-                f"User searched for '{latest_query}' and played tracks, "
-                f"indicating '{candidate_intent}' as the new listening context."
-            ),
-        }
-
-    romantic_plays = _plays_suggest_theme(plays, ROMANTIC_SIGNALS)
-    if romantic_plays >= 2 and not _intent_matches(current_intent, "romantic"):
-        return {
-            "intent_changed": True,
-            "new_intent": "Romantic",
-            "preferred_artists": preferred_artists,
-            "confidence": 0.84,
-            "reason": (
-                f"User played {romantic_plays} romantic tracks, "
-                f"shifting away from '{current_intent or 'their previous mood'}'."
-            ),
-        }
-
-    return None
+    return {
+        "intent_changed": False,
+        "new_intent": current_intent,
+        "preferred_artists": preferred_artists,
+        "preferred_genres": preferred_genres,
+        "confidence": 0.65,
+        "reason": "Insufficient repeated search evidence to change listening intent.",
+    }
 
 
 def merge_intent_results(ai_result: dict, rule_result: dict | None) -> dict:
@@ -193,14 +191,20 @@ def merge_intent_results(ai_result: dict, rule_result: dict | None) -> dict:
         [str(name) for name in ai_result.get("preferred_artists", [])],
         [str(name) for name in rule_result.get("preferred_artists", [])],
     )
+    merged["preferred_genres"] = merge_preferred_genres(
+        [str(name) for name in ai_result.get("preferred_genres", [])],
+        [str(name) for name in rule_result.get("preferred_genres", [])],
+    )
 
     if rule_result.get("intent_changed") and not ai_result.get("intent_changed"):
-        merged.update(rule_result)
+        if is_valid_intent(str(rule_result.get("new_intent", ""))):
+            merged.update(rule_result)
         return merged
 
     if (
         rule_result.get("intent_changed")
         and float(rule_result.get("confidence", 0)) > float(ai_result.get("confidence", 0))
+        and is_valid_intent(str(rule_result.get("new_intent", "")))
     ):
         merged.update(rule_result)
         return merged

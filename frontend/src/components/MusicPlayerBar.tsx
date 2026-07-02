@@ -127,12 +127,7 @@ export default function MusicPlayerBar() {
 
           <div className="flex shrink-0 items-center gap-1">
             <div className="hidden md:block">
-              <PlayerFeedbackButtons
-                track={currentTrack}
-                onSkipAfter={() => {
-                  playNext();
-                }}
-              />
+              <PlayerFeedbackButtons track={currentTrack} />
             </div>
 
             <button

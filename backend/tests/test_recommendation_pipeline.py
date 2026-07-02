@@ -17,42 +17,48 @@ from app.services.recommendation_generator import (
 )
 
 
-def _track(track_id: str, artist_id: str, name: str, popularity: int = 50) -> Track:
+def _track(
+    track_id: str,
+    artist_id: str,
+    name: str,
+    *,
+    popularity: int = 50,
+    primary_genre: str | None = "Indie Rock",
+) -> Track:
     return Track(
         id=track_id,
         name=name,
         artists=[Artist(id=artist_id, name=f"Artist {artist_id}", genres=["indie"])],
         album=Album(id=f"album-{track_id}", name="Album"),
         popularity=popularity,
+        primary_genre=primary_genre,
     )
 
 
-def test_build_search_queries_includes_prompt_and_genres() -> None:
+def test_build_search_queries_prioritizes_genres_over_raw_intent() -> None:
     context = UserContext(
         top_artists=[Artist(id="a1", name="Bon Iver", genres=["indie folk"])],
         top_genres=["indie folk", "acoustic"],
     )
-    queries = build_search_queries(context, "relaxing focus music")
-    assert "relaxing focus music" in queries
-    assert any("indie folk" in query for query in queries)
-    assert any("Bon Iver" in query for query in queries)
+    queries = build_search_queries(context, "hindi poetry")
+    assert "hindi poetry" not in queries
+    assert any("Bollywood" in query or "Indian" in query for query in queries)
 
 
-def test_fallback_rank_returns_popularity_order() -> None:
+def test_fallback_rank_prefers_genre_match() -> None:
     candidates = [
-        _track("t1", "a1", "Low", popularity=10),
-        _track("t2", "a2", "High", popularity=90),
+        _track("t1", "a1", "Poetry In Title", popularity=90, primary_genre="Soundtrack"),
+        _track("t2", "a2", "Unrelated Name", popularity=10, primary_genre="Indian Pop"),
     ]
-    ranked = fallback_rank(candidates, "chill vibes", limit=2)
+    ranked = fallback_rank(candidates, "hindi poetry", limit=2, profile_genres=["Bollywood"])
     assert ranked[0].track_id == "t2"
-    assert "chill vibes" in ranked[0].reason
 
 
 def test_apply_artist_diversity_caps_duplicates() -> None:
     tracks = {
-        "t1": _track("t1", "a1", "One", 80),
-        "t2": _track("t2", "a1", "Two", 70),
-        "t3": _track("t3", "a2", "Three", 60),
+        "t1": _track("t1", "a1", "One", popularity=80),
+        "t2": _track("t2", "a1", "Two", popularity=70),
+        "t3": _track("t3", "a2", "Three", popularity=60),
     }
     ranked = [
         RankedTrackResult(track_id="t1", rank=1, reason="r1", confidence=0.9, score=90),
@@ -67,7 +73,7 @@ def test_apply_artist_diversity_caps_duplicates() -> None:
 @pytest.mark.asyncio
 async def test_generator_uses_fallback_when_ai_fails() -> None:
     catalog = MagicMock()
-    catalog.search_tracks = AsyncMock(return_value=[_track("t1", "a1", "Track 1", 80)])
+    catalog.search_tracks = AsyncMock(return_value=[_track("t1", "a1", "Track 1", popularity=80)])
 
     ai = MagicMock()
     ai.rank_tracks = AsyncMock(side_effect=RuntimeError("AI down"))
@@ -93,7 +99,7 @@ async def test_generator_uses_fallback_when_ai_fails() -> None:
 @pytest.mark.asyncio
 async def test_generator_filters_hallucinated_track_ids() -> None:
     catalog = MagicMock()
-    catalog.search_tracks = AsyncMock(return_value=[_track("t1", "a1", "Track 1", 80)])
+    catalog.search_tracks = AsyncMock(return_value=[_track("t1", "a1", "Track 1", popularity=80)])
 
     ai = MagicMock()
     ai.rank_tracks = AsyncMock(

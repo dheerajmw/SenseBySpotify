@@ -1,8 +1,9 @@
 import { APP_NAME } from "../constants/brand";
 import { useSession } from "../hooks/useSession";
+import { INTENT_CONFIDENCE_THRESHOLD } from "../utils/intentEvidence";
 
 export default function IntentChangeModal() {
-  const { intentChangeModal } = useSession();
+  const { intentChangeModal, session } = useSession();
 
   if (!intentChangeModal) {
     return null;
@@ -20,7 +21,7 @@ export default function IntentChangeModal() {
     >
       <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950/95 p-5 shadow-2xl backdrop-blur-xl sm:p-8">
         <p className="text-center text-sm text-emerald-300">
-          ✨ {APP_NAME} understood a change in your listening behaviour.
+          ✨ {APP_NAME} detected a mood shift (reached {INTENT_CONFIDENCE_THRESHOLD} points).
         </p>
         <h2 id="intent-change-title" className="mt-4 text-center text-xl font-semibold">
           Intent Updated
@@ -45,11 +46,16 @@ export default function IntentChangeModal() {
         {reason && (
           <div className="mt-6 rounded-xl bg-zinc-900/80 px-4 py-3">
             <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">
-              Reason
+              Why Sense switched
             </p>
             <p className="mt-2 text-sm leading-relaxed text-zinc-300">{reason}</p>
           </div>
         )}
+
+        <p className="mt-4 text-center text-xs text-zinc-500">
+          Session confidence: {Math.round(session.intentConfidence)} / {INTENT_CONFIDENCE_THRESHOLD}{" "}
+          points
+        </p>
 
         <div className="mt-8 flex items-center justify-center gap-2 text-sm text-zinc-400">
           {refreshing && (

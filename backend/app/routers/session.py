@@ -58,6 +58,7 @@ async def update_session_intent(
         payload.session.current_intent,
         actions,
         profile_artists=profile_artists,
+        profile_genres=payload.profile.genres,
     )
 
     try:
@@ -87,6 +88,7 @@ async def update_session_intent(
         result,
         current_intent=payload.session.current_intent,
         profile_artists=profile_artists,
+        profile_genres=payload.profile.genres,
         recommendation_artists=recommendation_artists,
     )
 
@@ -94,6 +96,10 @@ async def update_session_intent(
         intent_changed=sanitized["intent_changed"],
         new_intent=sanitized["new_intent"],
         preferred_artists=sanitized["preferred_artists"],
+        preferred_genres=sanitized["preferred_genres"],
         confidence=sanitized["confidence"],
         reason=sanitized["reason"],
+        validation_status=sanitized.get("validation_status", "accepted"),
+        validation_message=sanitized.get("validation_message"),
+        raw_new_intent=sanitized.get("raw_new_intent"),
     )

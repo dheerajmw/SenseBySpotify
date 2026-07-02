@@ -44,6 +44,13 @@ def apply_feedback_heuristics(
         session.exploration_profile = min(1.0, session.exploration_profile + 0.03)
     elif event.event_type == FeedbackEventType.LIKE:
         session.exploration_profile = min(1.0, session.exploration_profile + 0.05)
+    elif event.event_type == FeedbackEventType.UNLIKE:
+        session.exploration_profile = max(0.0, session.exploration_profile - 0.02)
+    elif event.event_type == FeedbackEventType.DISLIKE:
+        session.novelty_tolerance = max(0.0, session.novelty_tolerance - 0.1)
+        session.exploration_profile = max(0.0, session.exploration_profile - 0.08)
+    elif event.event_type == FeedbackEventType.UNDISLIKE:
+        session.exploration_profile = min(1.0, session.exploration_profile + 0.02)
     elif event.event_type == FeedbackEventType.SEARCH and event.query:
         session.apply_query(event.query)
 

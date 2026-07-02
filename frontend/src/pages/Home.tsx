@@ -2,13 +2,16 @@ import { Link } from "react-router-dom";
 import RecommendationCard from "../components/RecommendationCard";
 import DiscoveryLevelCard from "../components/DiscoveryLevelCard";
 import HomeHeroSection from "../components/HomeHeroSection";
+import SessionIntentCard from "../components/SessionIntentCard";
 import WhyRecommendationsChangedCard from "../components/WhyRecommendationsChangedCard";
 import TrackRow from "../components/TrackRow";
 import { usePlayer } from "../contexts/PlayerContext";
 import { useProfile } from "../contexts/ProfileContext";
 import { useRecommendations } from "../contexts/RecommendationsContext";
 import { useFeedback } from "../hooks/useFeedback";
+import { useSkipRecommendation } from "../hooks/useSkipRecommendation";
 import { useSession } from "../hooks/useSession";
+import { getActiveIntent } from "../utils/sessionLifecycle";
 import { intentsAlign } from "../utils/intent";
 import type { Recommendation } from "../types";
 
@@ -17,22 +20,19 @@ export default function Home() {
   const { session, isRegeneratingFeed } = useSession();
   const { recommendations, query, history, trending } = useRecommendations();
   const { recentPlays } = usePlayer();
-  const { sendFeedback } = useFeedback();
+  const { sendFeedback, toggleLike, toggleDislike } = useFeedback();
+  const { skipRecommendation } = useSkipRecommendation();
 
   async function handleSkip(recommendation: Recommendation) {
-    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
-    await sendFeedback({
-      track_id: recommendation.track.id,
-      event_type: "skip",
-      track_label: label,
-    });
+    await skipRecommendation(recommendation);
   }
 
   async function handleLike(recommendation: Recommendation) {
+    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
     if (profile.likedTrackIds.includes(recommendation.track.id)) {
+      await toggleLike(recommendation.track.id, label);
       return;
     }
-    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
     await sendFeedback({
       track_id: recommendation.track.id,
       event_type: "like",
@@ -40,7 +40,16 @@ export default function Home() {
     });
   }
 
-  const activeIntent = session.currentIntent || profile.currentIntent;
+  async function handleDislike(recommendation: Recommendation) {
+    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
+    const wasDisliked = profile.dislikedTrackIds.includes(recommendation.track.id);
+    await toggleDislike(recommendation.track.id, label);
+    if (!wasDisliked) {
+      await skipRecommendation(recommendation);
+    }
+  }
+
+  const activeIntent = getActiveIntent(session);
   const feedMatchesIntent =
     Boolean(query) && intentsAlign(query ?? "", activeIntent);
   const showRecommendations =
@@ -53,6 +62,7 @@ export default function Home() {
   return (
     <div className="space-y-5 sm:space-y-8">
       <HomeHeroSection greeting={greeting} activeIntent={activeIntent} />
+      <SessionIntentCard />
       <DiscoveryLevelCard />
       <WhyRecommendationsChangedCard />
 
@@ -100,6 +110,7 @@ export default function Home() {
                 recommendation={item}
                 compact
                 onLike={(rec) => void handleLike(rec)}
+                onDislike={(rec) => void handleDislike(rec)}
                 onSkip={(rec) => void handleSkip(rec)}
               />
             ))}
@@ -134,6 +145,7 @@ export default function Home() {
                 recommendation={item}
                 compact
                 onLike={(rec) => void handleLike(rec)}
+                onDislike={(rec) => void handleDislike(rec)}
                 onSkip={(rec) => void handleSkip(rec)}
               />
             ))}

@@ -1,13 +1,12 @@
 import { Link } from "react-router-dom";
 import PlayerFeedbackButtons from "../components/PlayerFeedbackButtons";
 import { usePlayer } from "../contexts/PlayerContext";
-import { useProfile } from "../contexts/ProfileContext";
 import { useSession } from "../hooks/useSession";
+import { getActiveIntent } from "../utils/sessionLifecycle";
 import { formatDuration } from "../utils/music";
 import { trackLabel } from "../utils/track";
 
 export default function NowPlaying() {
-  const { profile } = useProfile();
   const { session } = useSession();
   const {
     currentTrack,
@@ -25,7 +24,7 @@ export default function NowPlaying() {
     playTrack,
   } = usePlayer();
 
-  const activeIntent = session.currentIntent || profile.currentIntent;
+  const activeIntent = getActiveIntent(session);
 
   if (!currentTrack) {
     return (
@@ -132,7 +131,7 @@ export default function NowPlaying() {
               </button>
               <button
                 type="button"
-                onClick={playNext}
+                onClick={() => playNext()}
                 disabled={!hasNext && !autoplayEnabled}
                 className="text-zinc-400 hover:text-white disabled:opacity-30"
                 aria-label="Next"
@@ -144,11 +143,7 @@ export default function NowPlaying() {
             </div>
 
             <div className="mt-4 flex justify-center sm:justify-start">
-              <PlayerFeedbackButtons
-                track={currentTrack}
-                onSkipAfter={playNext}
-                size="md"
-              />
+              <PlayerFeedbackButtons track={currentTrack} size="md" />
             </div>
 
             <div className="mt-6 flex items-center gap-3 text-xs text-zinc-500">

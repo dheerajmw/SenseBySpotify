@@ -18,6 +18,7 @@ const DEFAULT_PROFILE: LocalUserProfile = {
   onboardingCompleted: false,
   feedbackEvents: [],
   likedTrackIds: [],
+  dislikedTrackIds: [],
 };
 
 interface ProfileContextValue {
@@ -32,6 +33,11 @@ interface ProfileContextValue {
     query?: string | null,
   ) => void;
   addLikedTrack: (trackId: string) => void;
+  removeLikedTrack: (trackId: string) => void;
+  addDislikedTrack: (trackId: string) => void;
+  removeDislikedTrack: (trackId: string) => void;
+  addSkipFeedback: (trackId: string, query?: string | null) => void;
+  appendFeedbackEvent: (event: FeedbackEvent) => void;
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -81,25 +87,28 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setProfile(DEFAULT_PROFILE);
   }, []);
 
+  const appendFeedbackEvent = useCallback((event: FeedbackEvent) => {
+    setProfile((current) => {
+      const next = {
+        ...current,
+        feedbackEvents: [...current.feedbackEvents, event],
+      };
+      persistProfile(next);
+      return next;
+    });
+  }, []);
+
   const addFeedback = useCallback(
     (trackId: string, chips: FeedbackChip[], query: string | null = null) => {
-      const event: FeedbackEvent = {
+      appendFeedbackEvent({
         track_id: trackId,
         event_type: "like",
         chips,
         query,
         timestamp: new Date().toISOString(),
-      };
-      setProfile((current) => {
-        const next = {
-          ...current,
-          feedbackEvents: [...current.feedbackEvents, event],
-        };
-        persistProfile(next);
-        return next;
       });
     },
-    [],
+    [appendFeedbackEvent],
   );
 
   const addLikedTrack = useCallback((trackId: string) => {
@@ -110,11 +119,68 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       const next = {
         ...current,
         likedTrackIds: [...current.likedTrackIds, trackId],
+        dislikedTrackIds: current.dislikedTrackIds.filter((id) => id !== trackId),
       };
       persistProfile(next);
       return next;
     });
   }, []);
+
+  const removeLikedTrack = useCallback((trackId: string) => {
+    setProfile((current) => {
+      if (!current.likedTrackIds.includes(trackId)) {
+        return current;
+      }
+      const next = {
+        ...current,
+        likedTrackIds: current.likedTrackIds.filter((id) => id !== trackId),
+      };
+      persistProfile(next);
+      return next;
+    });
+  }, []);
+
+  const addDislikedTrack = useCallback((trackId: string) => {
+    setProfile((current) => {
+      if (current.dislikedTrackIds.includes(trackId)) {
+        return current;
+      }
+      const next = {
+        ...current,
+        dislikedTrackIds: [...current.dislikedTrackIds, trackId],
+        likedTrackIds: current.likedTrackIds.filter((id) => id !== trackId),
+      };
+      persistProfile(next);
+      return next;
+    });
+  }, []);
+
+  const removeDislikedTrack = useCallback((trackId: string) => {
+    setProfile((current) => {
+      if (!current.dislikedTrackIds.includes(trackId)) {
+        return current;
+      }
+      const next = {
+        ...current,
+        dislikedTrackIds: current.dislikedTrackIds.filter((id) => id !== trackId),
+      };
+      persistProfile(next);
+      return next;
+    });
+  }, []);
+
+  const addSkipFeedback = useCallback(
+    (trackId: string, query: string | null = null) => {
+      appendFeedbackEvent({
+        track_id: trackId,
+        event_type: "skip",
+        chips: [],
+        query,
+        timestamp: new Date().toISOString(),
+      });
+    },
+    [appendFeedbackEvent],
+  );
 
   const value = useMemo(
     () => ({
@@ -125,6 +191,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       resetProfile,
       addFeedback,
       addLikedTrack,
+      removeLikedTrack,
+      addDislikedTrack,
+      removeDislikedTrack,
+      addSkipFeedback,
+      appendFeedbackEvent,
     }),
     [
       profile,
@@ -133,6 +204,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       resetProfile,
       addFeedback,
       addLikedTrack,
+      removeLikedTrack,
+      addDislikedTrack,
+      removeDislikedTrack,
+      addSkipFeedback,
+      appendFeedbackEvent,
     ],
   );
 

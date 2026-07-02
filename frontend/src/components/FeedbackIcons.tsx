@@ -60,3 +60,30 @@ export function ReplayIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function DislikeIcon({ className, filled }: IconProps & { filled?: boolean }) {
+  if (filled) {
+    return (
+      <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+        <path d="M10.125 3.375 9.09 5.55a1.125 1.125 0 0 1-1.06.72H4.5a1.125 1.125 0 0 0-1.125 1.125v7.5c0 .621.504 1.125 1.125 1.125h3.53c.398 0 .78.158 1.06.44l1.06 1.06a1.125 1.125 0 0 0 1.902-.63V4.005a1.125 1.125 0 0 0-1.902-.63ZM15.75 9.75h3.375a1.125 1.125 0 0 1 1.125 1.125v7.5a1.125 1.125 0 0 1-1.125 1.125H15.75m0 0v-9.75" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M10.125 3.375 9.09 5.55a1.125 1.125 0 0 1-1.06.72H4.5a1.125 1.125 0 0 0-1.125 1.125v7.5c0 .621.504 1.125 1.125 1.125h3.53c.398 0 .78.158 1.06.44l1.06 1.06a1.125 1.125 0 0 0 1.902-.63V4.005a1.125 1.125 0 0 0-1.902-.63ZM15.75 9.75h3.375a1.125 1.125 0 0 1 1.125 1.125v7.5a1.125 1.125 0 0 1-1.125 1.125H15.75m0 0v-9.75"
+      />
+    </svg>
+  );
+}

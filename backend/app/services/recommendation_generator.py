@@ -9,6 +9,11 @@ from app.services.ai.base import RankedTrackResult
 from app.services.ai.openai_provider import OpenAIProvider
 from app.services.candidates import fetch_candidates
 from app.services.context_builder import UserContextBuilder
+from app.services.intent_genre_matching import (
+    resolve_target_genres,
+    score_track_genre_fit,
+    sort_tracks_by_genre_fit,
+)
 from app.services.music_catalog import MusicCatalogClient
 
 logger = logging.getLogger(__name__)
@@ -20,25 +25,26 @@ def fallback_rank(
     candidates: list[Track],
     query: str,
     limit: int,
+    *,
+    profile_genres: list[str] | None = None,
 ) -> list[RankedTrackResult]:
-    sorted_tracks = sorted(
-        candidates,
-        key=lambda track: track.popularity or 0,
-        reverse=True,
-    )
+    target_genres = resolve_target_genres(query, profile_genres or [])
+    sorted_tracks = sort_tracks_by_genre_fit(candidates, target_genres, query)
     results: list[RankedTrackResult] = []
     for index, track in enumerate(sorted_tracks[:limit], start=1):
-        confidence = max(0.4, 0.85 - (index - 1) * 0.05)
+        genre_fit = score_track_genre_fit(track, target_genres, query)
+        confidence = max(0.4, min(0.9, 0.45 + genre_fit * 0.45))
+        genre_label = track.primary_genre or "its style"
         results.append(
             RankedTrackResult(
                 track_id=track.id,
                 rank=index,
                 reason=(
-                    f"Recommended based on your intent \"{query}\" and Deezer catalogue relevance. "
-                    "AI ranking was unavailable, so popularity was used as a fallback."
+                    f"Recommended because {genre_label} aligns with your \"{query}\" listening intent "
+                    f"and taste profile."
                 ),
                 confidence=round(confidence, 2),
-                score=max(40, 95 - (index - 1) * 5),
+                score=max(40, int(60 + genre_fit * 35)),
             )
         )
     return results
@@ -125,7 +131,7 @@ class RecommendationGenerator:
         except Exception as exc:
             logger.warning("AI ranking failed, using fallback: %s", exc)
             used_ai = False
-            ranked = fallback_rank(candidates, query, limit)
+            ranked = fallback_rank(candidates, query, limit, profile_genres=list(profile.genres))
 
         ranked = apply_artist_diversity(ranked, tracks_by_id, limit)
 

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { LikeIcon, SkipIcon } from "./FeedbackIcons";
+import { DislikeIcon, LikeIcon, SkipIcon } from "./FeedbackIcons";
 import { usePlayer } from "../contexts/PlayerContext";
 import { useProfile } from "../contexts/ProfileContext";
 import { useRecommendations } from "../contexts/RecommendationsContext";
 import { useSession } from "../hooks/useSession";
+import { getActiveIntent } from "../utils/sessionLifecycle";
 import type { Recommendation } from "../types";
 import {
   formatConfidence,
@@ -16,6 +17,7 @@ import { trackLabel } from "../utils/track";
 interface RecommendationCardProps {
   recommendation: Recommendation;
   onLike?: (recommendation: Recommendation) => void;
+  onDislike?: (recommendation: Recommendation) => void;
   onSkip?: (recommendation: Recommendation) => void;
   showDetailsLink?: boolean;
   compact?: boolean;
@@ -52,6 +54,7 @@ function CheckIcon() {
 export default function RecommendationCard({
   recommendation,
   onLike,
+  onDislike,
   onSkip,
   showDetailsLink = true,
   compact = false,
@@ -63,7 +66,7 @@ export default function RecommendationCard({
   const [showWhy, setShowWhy] = useState(false);
   const { track, rank, confidence } = recommendation;
   const artistNames = track.artists.map((artist) => artist.name).join(", ");
-  const sessionIntent = session.currentIntent || profile.currentIntent;
+  const sessionIntent = getActiveIntent(session);
   const fitBullets = buildRecommendationFitBullets(
     recommendation,
     profile,
@@ -71,6 +74,7 @@ export default function RecommendationCard({
   );
   const playing = isTrackPlaying(track.id);
   const isLiked = profile.likedTrackIds.includes(track.id);
+  const isDisliked = profile.dislikedTrackIds.includes(track.id);
   const canPlay = Boolean(track.preview_url || track.external_url);
   const artSize = compact ? "h-16 w-16" : "h-20 w-20";
   const queue = recommendations.map((item) => item.track);
@@ -83,6 +87,7 @@ export default function RecommendationCard({
     playTrack(track, {
       queue: queue.length > 0 ? queue : [track],
       startIndex: queue.findIndex((item) => item.id === track.id),
+      queueSource: "intent",
     });
   }
 
@@ -162,7 +167,7 @@ export default function RecommendationCard({
               <button
                 type="button"
                 onClick={() => onLike(recommendation)}
-                aria-label={isLiked ? "Liked" : "Like"}
+                aria-label={isLiked ? "Unlike" : "Like"}
                 aria-pressed={isLiked}
                 className={[
                   "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition",
@@ -172,11 +177,29 @@ export default function RecommendationCard({
                 ].join(" ")}
               >
                 <LikeIcon className="h-3.5 w-3.5" filled={isLiked} />
-                {isLiked ? "Liked" : "Like"}
+                {isLiked ? "Unlike" : "Like"}
               </button>
             )}
 
-            {onSkip && (
+            {onDislike && (
+              <button
+                type="button"
+                onClick={() => onDislike(recommendation)}
+                aria-label={isDisliked ? "Remove dislike" : "Dislike"}
+                aria-pressed={isDisliked}
+                className={[
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                  isDisliked
+                    ? "border-rose-500/50 bg-rose-500/15 text-rose-300"
+                    : "border-rose-500/40 text-rose-300 hover:bg-rose-500/10",
+                ].join(" ")}
+              >
+                <DislikeIcon className="h-3.5 w-3.5" filled={isDisliked} />
+                {isDisliked ? "Undislike" : "Dislike"}
+              </button>
+            )}
+
+            {onSkip && currentTrack?.id === track.id && (
               <button
                 type="button"
                 onClick={() => onSkip(recommendation)}

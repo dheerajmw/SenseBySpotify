@@ -1,3 +1,5 @@
+import type { Track } from "../types";
+
 export interface PendingIntentRefresh {
   intent: string;
   preferredArtists: string[];
@@ -9,6 +11,7 @@ export const playbackBridge = {
   isPlaying: false,
   autoplayEnabled: true,
   pendingIntentRefresh: null as PendingIntentRefresh | null,
+  lastEndedTrack: null as Track | null,
   listeners: new Set<TrackEndedListener>(),
 
   subscribe(listener: TrackEndedListener) {
@@ -16,6 +19,10 @@ export const playbackBridge = {
     return () => {
       this.listeners.delete(listener);
     };
+  },
+
+  setLastEndedTrack(track: Track) {
+    this.lastEndedTrack = track;
   },
 
   notifyTrackEnded() {

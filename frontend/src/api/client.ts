@@ -62,6 +62,7 @@ function toProfilePayload(profile: LocalUserProfile) {
     onboarding_completed: profile.onboardingCompleted,
     feedback_events: profile.feedbackEvents,
     liked_track_ids: profile.likedTrackIds,
+    disliked_track_ids: profile.dislikedTrackIds,
   };
 }
 

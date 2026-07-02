@@ -18,6 +18,7 @@ from app.services.ai.prompts import (
     SYSTEM_PROMPT,
     build_user_prompt,
 )
+from app.services.intent_genre_matching import resolve_target_genres
 from app.services.ai.session_intent_prompts import (
     SESSION_INTENT_SYSTEM,
     build_session_intent_user_prompt,
@@ -87,6 +88,7 @@ class OpenAIProvider:
         familiar_percent = max(0, 100 - discovery_percent)
         context_summary = {
             "genres": context.top_genres[:8],
+            "target_genres": resolve_target_genres(query, context.top_genres),
             "favourite_artists": [artist.name for artist in context.top_artists[:8]],
             "current_intent": context.current_query,
             "discovery_level_percent": discovery_percent,
@@ -109,6 +111,7 @@ class OpenAIProvider:
                 "id": track.id,
                 "title": track.name,
                 "artist": track.artists[0].name if track.artists else "Unknown",
+                "genre": track.primary_genre,
             }
             for track in candidates
         ]
@@ -185,11 +188,21 @@ class OpenAIProvider:
             raise AppError("AI returned invalid JSON", status_code=502) from exc
 
         return {
-            "intent_changed": bool(parsed.get("intent_changed", False)),
-            "new_intent": str(parsed.get("new_intent", current_intent)).strip() or current_intent,
+            "intent_changed": bool(
+                parsed.get("intent_changed", parsed.get("intentChanged", False))
+            ),
+            "new_intent": str(
+                parsed.get("new_intent", parsed.get("newIntent", current_intent))
+            ).strip()
+            or current_intent,
             "preferred_artists": [
                 str(name).strip()
-                for name in parsed.get("preferred_artists", [])
+                for name in parsed.get("preferred_artists", parsed.get("preferredArtists", []))
+                if str(name).strip()
+            ],
+            "preferred_genres": [
+                str(name).strip()
+                for name in parsed.get("preferred_genres", parsed.get("preferredGenres", []))
                 if str(name).strip()
             ],
             "confidence": min(1.0, max(0.0, float(parsed.get("confidence", 0.5)))),

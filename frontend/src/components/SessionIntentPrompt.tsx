@@ -1,17 +1,20 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiClientError } from "../api/client";
-import AIPromptInput from "../components/AIPromptInput";
-import RecommendationCardSkeleton from "../components/RecommendationCardSkeleton";
-import { APP_NAME, DISCOVER_LABEL, INTENT_CHIPS } from "../constants/brand";
+import AIPromptInput from "./AIPromptInput";
+import { APP_NAME, INTENT_CHIPS } from "../constants/brand";
 import { useSession } from "../hooks/useSession";
 
-export default function AIDiscovery() {
+export default function SessionIntentPrompt() {
   const navigate = useNavigate();
-  const { logAction, establishSessionIntent } = useSession();
+  const { needsIntentPrompt, establishSessionIntent, logAction } = useSession();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (!needsIntentPrompt) {
+    return null;
+  }
 
   async function handleSubmit() {
     const trimmed = query.trim();
@@ -31,7 +34,7 @@ export default function AIDiscovery() {
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Failed to generate recommendations",
+            : "Failed to start your listening session",
       );
     } finally {
       setLoading(false);
@@ -39,20 +42,29 @@ export default function AIDiscovery() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-900/80 to-emerald-950/20 p-4 backdrop-blur sm:rounded-3xl sm:p-6 md:p-8">
-        <p className="text-sm uppercase tracking-widest text-emerald-400">
-          {DISCOVER_LABEL}
+    <div
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="session-intent-prompt-title"
+    >
+      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl sm:p-8">
+        <p className="text-xs font-medium uppercase tracking-widest text-emerald-400">
+          New listening session
         </p>
-        <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">
-          Describe what you want to hear
+        <h2
+          id="session-intent-prompt-title"
+          className="mt-2 text-2xl font-semibold text-white sm:text-3xl"
+        >
+          What are you listening for today?
         </h2>
-        <p className="mt-4 max-w-2xl text-zinc-400">
-          {APP_NAME} uses your taste profile, current session intent, and iTunes catalogue
-          candidates to rank recommendations with clear explanations.
+        <p className="mt-3 text-sm text-zinc-400">
+          {APP_NAME} keeps your taste profile, but each visit starts fresh. Tell us
+          what you want to hear right now and we&apos;ll build recommendations for
+          this session.
         </p>
 
-        <div className="mt-6 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap gap-2">
           {INTENT_CHIPS.map((chip) => (
             <button
               key={chip}
@@ -74,18 +86,7 @@ export default function AIDiscovery() {
             onSubmit={() => void handleSubmit()}
           />
         </div>
-      </section>
-
-      {loading && (
-        <section className="space-y-4">
-          <p className="text-sm text-zinc-500">
-            Searching iTunes, gathering candidates, and ranking with AI...
-          </p>
-          <RecommendationCardSkeleton />
-          <RecommendationCardSkeleton />
-          <RecommendationCardSkeleton />
-        </section>
-      )}
+      </div>
     </div>
   );
 }

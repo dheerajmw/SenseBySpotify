@@ -4,6 +4,7 @@ import BrandHeader from "./BrandHeader";
 import DemoModeToggle from "./DemoModeToggle";
 import GlobalSearch from "./GlobalSearch";
 import MusicPlayerBar from "./MusicPlayerBar";
+import SessionIntentPrompt from "./SessionIntentPrompt";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -48,6 +49,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <MusicPlayerBar />
+      <SessionIntentPrompt />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, ApiClientError } from "../api/client";
 import TrackRow from "../components/TrackRow";
@@ -17,10 +17,20 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { logAction } = useSession();
+  const lastLoggedSearchRef = useRef<string | null>(null);
 
   useEffect(() => {
     setInput(query);
   }, [query]);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2 || lastLoggedSearchRef.current === trimmed) {
+      return;
+    }
+    lastLoggedSearchRef.current = trimmed;
+    logAction("SEARCH", trimmed);
+  }, [query, logAction]);
 
   useEffect(() => {
     if (query.trim().length < 2) {
@@ -41,11 +51,6 @@ export default function Search() {
         if (!controller.signal.aborted) {
           setTracks(trackResponse.tracks);
           setArtists(artistResponse.artists);
-          logAction("SEARCH_TRACK", query.trim());
-          logAction("SEARCH", query.trim());
-          if (artistResponse.artists.length > 0) {
-            logAction("SEARCH_ARTIST", query.trim());
-          }
         }
       } catch (err) {
         if (!controller.signal.aborted) {
@@ -64,7 +69,7 @@ export default function Search() {
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [query, logAction]);
+  }, [query]);
 
   function handleSearchSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -72,7 +77,9 @@ export default function Search() {
     if (!trimmed) {
       return;
     }
+    lastLoggedSearchRef.current = trimmed;
     setSearchParams({ q: trimmed });
+    logAction("SEARCH", trimmed);
   }
 
   return (
@@ -157,8 +164,11 @@ export default function Search() {
                 key={artist.id}
                 type="button"
                 onClick={() => {
+                  lastLoggedSearchRef.current = artist.name;
                   setSearchParams({ q: artist.name });
                   setTab("songs");
+                  logAction("SEARCH", artist.name);
+                  logAction("SEARCH_ARTIST", artist.name);
                 }}
                 className="flex min-w-0 items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-left transition hover:border-zinc-700 sm:p-4"
               >

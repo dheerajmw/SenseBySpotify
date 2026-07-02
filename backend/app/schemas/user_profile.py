@@ -18,4 +18,5 @@ class UserProfilePayload(BaseModel):
     current_intent: str = ""
     feedback_events: list[FeedbackEvent] = Field(default_factory=list)
     liked_track_ids: list[str] = Field(default_factory=list)
+    disliked_track_ids: list[str] = Field(default_factory=list)
     onboarding_completed: bool = True

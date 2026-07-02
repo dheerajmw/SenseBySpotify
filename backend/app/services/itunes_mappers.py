@@ -7,9 +7,11 @@ from app.models.track import Album, Track
 
 
 def map_itunes_track(raw: dict[str, Any]) -> Track:
+    primary_genre = (raw.get("primaryGenreName") or "").strip() or None
     artist = Artist(
         id=str(raw.get("artistId", raw.get("trackId", "unknown"))),
         name=raw.get("artistName", "Unknown artist"),
+        genres=[primary_genre] if primary_genre else [],
         image_url=None,
         external_url=raw.get("artistViewUrl"),
     )
@@ -24,6 +26,7 @@ def map_itunes_track(raw: dict[str, Any]) -> Track:
         name=raw.get("trackName", "Unknown track"),
         artists=[artist],
         album=album,
+        primary_genre=primary_genre,
         duration_ms=raw.get("trackTimeMillis"),
         preview_url=raw.get("previewUrl"),
         external_url=raw.get("trackViewUrl"),

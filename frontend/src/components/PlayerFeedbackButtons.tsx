@@ -1,14 +1,14 @@
 import type { ReactNode } from "react";
-import { LikeIcon, ReplayIcon, SkipIcon } from "./FeedbackIcons";
+import { DislikeIcon, LikeIcon, ReplayIcon, SkipIcon } from "./FeedbackIcons";
 import { usePlayer } from "../contexts/PlayerContext";
 import { useProfile } from "../contexts/ProfileContext";
+import { useRecommendations } from "../contexts/RecommendationsContext";
 import { useFeedback } from "../hooks/useFeedback";
 import type { Track } from "../types";
 import { trackLabel } from "../utils/track";
 
 interface PlayerFeedbackButtonsProps {
   track: Track;
-  onSkipAfter?: () => void;
   size?: "sm" | "md";
 }
 
@@ -16,6 +16,7 @@ interface ActionButtonProps {
   label: string;
   onClick: () => void;
   active?: boolean;
+  activeClassName?: string;
   size: "sm" | "md";
   children: ReactNode;
 }
@@ -24,6 +25,7 @@ function ActionButton({
   label,
   onClick,
   active,
+  activeClassName,
   size,
   children,
 }: ActionButtonProps) {
@@ -31,6 +33,10 @@ function ActionButton({
     size === "md"
       ? "flex h-5 w-5 shrink-0 items-center justify-center"
       : "flex h-4 w-4 shrink-0 items-center justify-center";
+
+  const activeStyles =
+    activeClassName ??
+    (active ? "bg-emerald-500 text-black shadow-sm shadow-emerald-500/20" : "");
 
   if (size === "md") {
     return (
@@ -42,7 +48,7 @@ function ActionButton({
         className={[
           "inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition",
           active
-            ? "bg-emerald-500 text-black shadow-sm shadow-emerald-500/20"
+            ? activeStyles
             : "text-zinc-300 hover:bg-zinc-800 hover:text-white",
         ].join(" ")}
       >
@@ -62,7 +68,7 @@ function ActionButton({
       className={[
         "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition",
         active
-          ? "bg-emerald-500 text-black"
+          ? activeStyles || "bg-emerald-500 text-black"
           : "text-zinc-200 hover:bg-zinc-800 hover:text-white",
       ].join(" ")}
     >
@@ -73,43 +79,52 @@ function ActionButton({
 
 export default function PlayerFeedbackButtons({
   track,
-  onSkipAfter,
   size = "sm",
 }: PlayerFeedbackButtonsProps) {
   const { profile } = useProfile();
-  const { replayCurrentTrack } = usePlayer();
-  const { sendFeedback } = useFeedback();
+  const { removeRecommendation } = useRecommendations();
+  const { replayCurrentTrack, removeFromQueue } = usePlayer();
+  const { sendFeedback, toggleLike, toggleDislike } = useFeedback();
   const isLiked = profile.likedTrackIds.includes(track.id);
+  const isDisliked = profile.dislikedTrackIds.includes(track.id);
   const label = trackLabel(track);
-
   const iconClass = "h-full w-full max-h-full max-w-full";
 
-  async function handleLike() {
-    if (isLiked) {
-      return;
+  async function handleLikeToggle() {
+    await toggleLike(track.id, label, undefined, track);
+  }
+
+  async function handleDislikeToggle() {
+    const wasDisliked = isDisliked;
+    await toggleDislike(track.id, label, track);
+    if (!wasDisliked) {
+      removeRecommendation(track.id);
+      removeFromQueue(track.id);
     }
-    await sendFeedback({
-      track_id: track.id,
-      event_type: "like",
-      track_label: label,
-    });
   }
 
   async function handleSkip() {
-    await sendFeedback({
-      track_id: track.id,
-      event_type: "skip",
-      track_label: label,
-    });
-    onSkipAfter?.();
+    await sendFeedback(
+      {
+        track_id: track.id,
+        event_type: "skip",
+        track_label: label,
+      },
+      { track },
+    );
+    removeRecommendation(track.id);
+    removeFromQueue(track.id);
   }
 
   async function handleReplay() {
-    await sendFeedback({
-      track_id: track.id,
-      event_type: "replay",
-      track_label: label,
-    });
+    await sendFeedback(
+      {
+        track_id: track.id,
+        event_type: "replay",
+        track_label: label,
+      },
+      { track },
+    );
     replayCurrentTrack();
   }
 
@@ -125,12 +140,22 @@ export default function PlayerFeedbackButtons({
       aria-label="Track feedback"
     >
       <ActionButton
-        label={isLiked ? "Liked" : "Like"}
+        label={isLiked ? "Unlike" : "Like"}
         size={size}
-        onClick={() => void handleLike()}
+        onClick={() => void handleLikeToggle()}
         active={isLiked}
       >
         <LikeIcon className={iconClass} filled={isLiked} />
+      </ActionButton>
+
+      <ActionButton
+        label={isDisliked ? "Remove dislike" : "Dislike"}
+        size={size}
+        onClick={() => void handleDislikeToggle()}
+        active={isDisliked}
+        activeClassName="bg-rose-500 text-white shadow-sm shadow-rose-500/20"
+      >
+        <DislikeIcon className={iconClass} filled={isDisliked} />
       </ActionButton>
 
       <ActionButton label="Skip" size={size} onClick={() => void handleSkip()}>
