@@ -5,9 +5,9 @@ import {
   EXPLICIT_PREFERENCE_SIGNALS_TARGET,
   INTENT_CONFIDENCE_THRESHOLD,
   MEANINGFUL_INTERACTIONS_TARGET,
-  OFF_CANDIDATE_GENRE_PLAY_TARGET,
   remainingInteractionsNeeded,
 } from "../utils/intentEvidence";
+import { intentsAlign } from "../utils/intent";
 import { buildIntentPredictionDisplay } from "../utils/intentPredictionDisplay";
 import {
   formatSessionAge,
@@ -104,10 +104,11 @@ export default function SessionDebugger() {
   const latestIntent = intentHistory.at(-1);
   const earlierIntents = intentHistory.slice(0, -1).reverse();
   const remaining = remainingInteractionsNeeded(session.interactionsCollected);
-  const candidateDiffers =
-    session.candidateIntent.trim() !== "" &&
-    session.candidateIntent.trim().toLowerCase() !==
-      session.currentIntent.trim().toLowerCase();
+  const candidateDiffers = Boolean(
+    session.candidateIntent &&
+      session.currentIntent &&
+      !intentsAlign(session.currentIntent, session.candidateIntent),
+  );
   const lastActions = [...session.recentActions].reverse().slice(0, 10);
   const validation = session.lastIntentValidation;
   const prediction = buildIntentPredictionDisplay(session, {
@@ -248,27 +249,19 @@ export default function SessionDebugger() {
                       candidateDiffers ? "text-amber-300" : "text-zinc-300",
                     ].join(" ")}
                   >
-                    {session.candidateIntent || session.currentIntent || "—"}
+                    {session.candidateIntent || "—"}
                   </dd>
                 </div>
-                {session.searchCandidate && (
-                  <div className="sm:col-span-2">
-                    <dt className="text-zinc-500">Search candidate</dt>
-                    <dd className="mt-0.5 font-medium text-sky-200">
-                      {session.searchCandidate.intent} — {session.searchCandidate.confidence}/
-                      {INTENT_CONFIDENCE_THRESHOLD} pts
-                      {session.searchCandidate.query
-                        ? ` · “${session.searchCandidate.query}”`
-                        : ""}
-                    </dd>
-                  </div>
-                )}
                 <div>
-                  <dt className="text-zinc-500">Merged confidence (points)</dt>
+                  <dt className="text-zinc-500">Candidate Confidence</dt>
                   <dd className="mt-0.5 font-medium text-white">
-                    {session.intentConfidence}
+                    {session.candidateConfidence}
                     {isCheckingIntent ? " · evaluating..." : ""}
                   </dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-500">Current Confidence</dt>
+                  <dd className="mt-0.5 font-medium text-white">{session.intentConfidence}</dd>
                 </div>
                 <div>
                   <dt className="text-zinc-500">Switch threshold (points)</dt>
@@ -282,20 +275,26 @@ export default function SessionDebugger() {
                     {session.intentDecision || "—"}
                   </dd>
                 </div>
-                {session.listeningShiftIntent && (
+                {session.lastPromotionReason && (
                   <div className="sm:col-span-2">
-                    <dt className="text-zinc-500">Listening pattern</dt>
-                    <dd className="mt-0.5 font-medium text-sky-200">
-                      {session.listeningShiftPlayCount}/{OFF_CANDIDATE_GENRE_PLAY_TARGET} plays toward{" "}
-                      {session.listeningShiftIntent}
+                    <dt className="text-zinc-500">Last promotion</dt>
+                    <dd className="mt-0.5 font-medium text-emerald-200">
+                      {session.lastPromotionReason}
+                    </dd>
+                  </div>
+                )}
+                {session.rejectedAiIntents.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <dt className="text-zinc-500">Rejected AI intents</dt>
+                    <dd className="mt-0.5 font-medium text-rose-200">
+                      {session.rejectedAiIntents.join(", ")}
                     </dd>
                   </div>
                 )}
                 <div>
-                  <dt className="text-zinc-500">Evidence</dt>
+                  <dt className="text-zinc-500">Evidence interactions</dt>
                   <dd className="mt-0.5 font-medium text-white">
-                    {session.interactionsCollected} / {MEANINGFUL_INTERACTIONS_TARGET}{" "}
-                    interactions
+                    {session.interactionsCollected} / {MEANINGFUL_INTERACTIONS_TARGET}
                   </dd>
                 </div>
                 <div>
@@ -313,6 +312,47 @@ export default function SessionDebugger() {
                   </dd>
                 </div>
               </dl>
+            </section>
+
+            <section className="mt-6 rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-sky-300">
+                Evidence log
+              </h3>
+              {session.evidence.length === 0 ? (
+                <p className="mt-3 text-sm text-zinc-500">No listening evidence yet.</p>
+              ) : (
+                <ul className="mt-3 max-h-40 space-y-2 overflow-y-auto text-xs text-zinc-300">
+                  {[...session.evidence].reverse().slice(0, 12).map((entry, index) => (
+                    <li key={`${entry.timestamp}-${index}`} className="rounded-lg bg-zinc-900/80 px-3 py-2">
+                      <span className="text-zinc-500">{formatTime(entry.timestamp)}</span>{" "}
+                      <span className="font-medium text-white">{entry.action}</span>{" "}
+                      {entry.delta > 0 ? "+" : ""}
+                      {entry.delta} → {entry.candidateConfidenceAfter}
+                      {entry.candidateIntent ? ` (${entry.candidateIntent})` : ""}
+                      <p className="mt-1 text-zinc-500">{entry.note}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="mt-6 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-violet-300">
+                Confidence timeline
+              </h3>
+              {session.confidenceTimeline.length === 0 ? (
+                <p className="mt-3 text-sm text-zinc-500">No candidate confidence changes yet.</p>
+              ) : (
+                <ul className="mt-3 max-h-40 space-y-2 overflow-y-auto text-xs text-zinc-300">
+                  {[...session.confidenceTimeline].reverse().slice(0, 10).map((entry, index) => (
+                    <li key={`${entry.timestamp}-${index}`} className="rounded-lg bg-zinc-900/80 px-3 py-2">
+                      <span className="text-zinc-500">{formatTime(entry.timestamp)}</span>{" "}
+                      {entry.candidateIntent ?? "—"} — {entry.candidateConfidence} pts
+                      <p className="mt-1 text-zinc-500">{entry.reason}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
 
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">

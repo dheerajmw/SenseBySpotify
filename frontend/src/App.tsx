@@ -4,7 +4,6 @@ import { OnboardingGate, RedirectIfOnboarded } from "./components/OnboardingGate
 import AIDiscovery from "./pages/AIDiscovery";
 import Home from "./pages/Home";
 import NowPlaying from "./pages/NowPlaying";
-import Onboarding from "./pages/Onboarding";
 import RecommendationDetails from "./pages/RecommendationDetails";
 import RecommendationFeed from "./pages/RecommendationFeed";
 import Search from "./pages/Search";
@@ -25,7 +24,7 @@ export default function App() {
         path="/onboarding"
         element={
           <RedirectIfOnboarded>
-            <Onboarding />
+            <Navigate to="/welcome" replace />
           </RedirectIfOnboarded>
         }
       />

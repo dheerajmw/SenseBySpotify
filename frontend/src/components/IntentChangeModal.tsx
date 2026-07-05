@@ -61,7 +61,11 @@ export default function IntentChangeModal() {
           {refreshing && (
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-400" />
           )}
-          <span>{refreshing ? "Refreshing recommendations..." : "Updating your session..."}</span>
+          <span>
+            {refreshing
+              ? "Refreshing recommendations..."
+              : "Your session mood has been updated"}
+          </span>
         </div>
       </div>
     </div>

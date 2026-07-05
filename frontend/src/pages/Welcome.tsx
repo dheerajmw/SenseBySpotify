@@ -1,7 +1,16 @@
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { APP_NAME, APP_TAGLINE } from "../constants/brand";
+import { useProfile } from "../contexts/ProfileContext";
 
 export default function Welcome() {
+  const navigate = useNavigate();
+  const { completeOnboarding } = useProfile();
+
+  function handleGetStarted() {
+    completeOnboarding();
+    navigate("/home", { replace: true });
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.25),_transparent_45%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.18),_transparent_40%)]" />
@@ -16,12 +25,13 @@ export default function Welcome() {
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-zinc-300">
             {APP_TAGLINE} and helps you discover music you&apos;ll actually love.
           </p>
-          <Link
-            to="/onboarding"
+          <button
+            type="button"
+            onClick={handleGetStarted}
             className="mt-10 inline-flex rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 px-8 py-3 text-sm font-semibold text-black transition hover:scale-[1.02] hover:from-emerald-300 hover:to-emerald-400"
           >
             Get Started
-          </Link>
+          </button>
         </div>
       </div>
     </div>

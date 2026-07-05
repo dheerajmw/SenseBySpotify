@@ -12,6 +12,7 @@ from app.exceptions import AppError
 from app.models.track import Track
 from app.models.user_context import UserContext
 from app.services.ai.base import AIRecommendationItem, AIRankResponse, RankedTrackResult
+from app.services.ai.retry import call_llm_with_single_retry, is_retriable_llm_error
 from app.services.ai.prompts import (
     FEW_SHOT_ASSISTANT,
     FEW_SHOT_USER,
@@ -88,7 +89,12 @@ class OpenAIProvider:
         familiar_percent = max(0, 100 - discovery_percent)
         context_summary = {
             "genres": context.top_genres[:8],
-            "target_genres": resolve_target_genres(query, context.top_genres),
+            "preferred_genres": context.preferred_genres[:8],
+            "target_genres": resolve_target_genres(
+                query,
+                context.top_genres,
+                context.preferred_genres,
+            ),
             "favourite_artists": [artist.name for artist in context.top_artists[:8]],
             "current_intent": context.current_query,
             "discovery_level_percent": discovery_percent,
@@ -138,27 +144,8 @@ class OpenAIProvider:
             self._settings.llm_model,
         )
 
-        last_error: Exception | None = None
-        for attempt in range(2):
-            try:
-                raw = await self._chat_completion(messages)
-                return self._parse_response(raw, candidates, limit)
-            except AppError as exc:
-                last_error = exc
-                if attempt == 0:
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": (
-                                "Your previous response was invalid. Return strict JSON with only "
-                                "candidate title and artist values from the list."
-                            ),
-                        }
-                    )
-                    continue
-                raise
-
-        raise AppError("AI ranking failed", status_code=502) from last_error
+        raw = await self._chat_completion(messages)
+        return self._parse_response(raw, candidates, limit)
 
     async def detect_session_intent(
         self,
@@ -210,43 +197,87 @@ class OpenAIProvider:
         }
 
     async def _chat_completion(self, messages: list[dict[str, str]]) -> str:
+        primary_model = self._settings.llm_model
+        try:
+            return await self._request_chat_completion(messages, primary_model)
+        except AppError as exc:
+            fallback_model = self._resolve_fallback_model(primary_model)
+            if fallback_model is None or not is_retriable_llm_error(exc):
+                raise
+            logger.warning(
+                "[AI] Primary model failed, trying fallback\nPrimary: %s\nFallback: %s\nReason: %s",
+                primary_model,
+                fallback_model,
+                exc.message,
+            )
+            result = await self._request_chat_completion(messages, fallback_model)
+            logger.info("[AI] Fallback model successful model=%s", fallback_model)
+            return result
+
+    def _resolve_fallback_model(self, primary_model: str) -> str | None:
+        fallback = self._settings.llm_fallback_model.strip()
+        if not fallback or fallback == primary_model.strip():
+            return None
+        return fallback
+
+    async def _request_chat_completion(
+        self,
+        messages: list[dict[str, str]],
+        model: str,
+    ) -> str:
         payload: dict[str, Any] = {
-            "model": self._settings.llm_model,
+            "model": model,
             "messages": messages,
             "response_format": {"type": "json_object"},
             "temperature": 0.4,
         }
 
-        async with httpx.AsyncClient(
-            timeout=self._settings.llm_timeout_seconds,
-        ) as client:
-            response = await client.post(
-                self._settings.llm_chat_completions_url,
-                headers={
-                    "Authorization": f"Bearer {self._settings.llm_api_key}",
-                    "Content-Type": "application/json",
-                },
-                json=payload,
-            )
+        async def _request() -> str:
+            async with httpx.AsyncClient(
+                timeout=self._settings.llm_timeout_seconds,
+            ) as client:
+                response = await client.post(
+                    self._settings.llm_chat_completions_url,
+                    headers={
+                        "Authorization": f"Bearer {self._settings.llm_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
 
-        if response.status_code >= 400:
-            logger.warning(
-                "LLM request failed (%s): %s",
-                self._settings.llm_base_url,
-                response.text,
-            )
-            detail = "AI request failed"
-            try:
-                error_body = response.json()
-                message = error_body.get("error", {}).get("message")
-                if message:
-                    detail = message
-            except (json.JSONDecodeError, AttributeError):
-                pass
-            raise AppError(detail, status_code=502)
+            if response.status_code >= 400:
+                logger.warning(
+                    "LLM request failed (%s) status=%s model=%s: %s",
+                    self._settings.llm_base_url,
+                    response.status_code,
+                    model,
+                    response.text,
+                )
+                detail = "AI request failed"
+                try:
+                    error_body = response.json()
+                    message = error_body.get("error", {}).get("message")
+                    if not message:
+                        message = error_body.get("message")
+                    if message:
+                        detail = message
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+                status_code = (
+                    503
+                    if response.status_code >= 500 or response.status_code == 429
+                    else 502
+                )
+                raise AppError(detail, status_code=status_code)
 
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+
+        return await call_llm_with_single_retry(
+            _request,
+            operation_name=f"chat_completion:{model}",
+            retry_backoff_seconds=self._settings.llm_retry_backoff_seconds,
+        )
 
     def _parse_response(
         self,

@@ -58,7 +58,7 @@ async def generate_recommendations(
         window_seconds=60,
     )
 
-    recommendations, candidate_count, used_ai = await generator.generate(
+    recommendations, candidate_count, used_ai, fallback_reason = await generator.generate(
         payload.profile,
         query=query,
         limit=payload.limit,
@@ -75,6 +75,7 @@ async def generate_recommendations(
         recommendations=recommendations,
         candidate_count=candidate_count,
         used_ai=used_ai,
+        fallback_reason=fallback_reason,
     )
 
 
@@ -98,7 +99,7 @@ async def recommend_from_last_track(
         window_seconds=60,
     )
 
-    recommendation, candidate_count, used_ai = await recommender.recommend_from_last_track(
+    recommendation, candidate_count, used_ai, fallback_reason = await recommender.recommend_from_last_track(
         payload.profile,
         last_track_id=payload.last_track.id,
         last_track_name=payload.last_track.name,
@@ -117,4 +118,5 @@ async def recommend_from_last_track(
         recommendation=recommendation,
         candidate_count=candidate_count,
         used_ai=used_ai,
+        fallback_reason=fallback_reason,
     )

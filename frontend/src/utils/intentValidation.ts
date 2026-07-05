@@ -1,3 +1,5 @@
+import { GENERAL_LISTENING_INTENT } from "../constants/brand";
+
 export const VALID_INTENTS = [
   "Focus",
   "Workout",
@@ -212,6 +214,17 @@ export function validateProposedIntent(
       intent: currentIntent,
       intentChanged: false,
       rejectionReason: "Discovery Level cannot become Session Intent.",
+      preferredArtists: [],
+      preferredGenres: [],
+    };
+  }
+
+  if (normalize(cleaned) === normalize(GENERAL_LISTENING_INTENT)) {
+    return {
+      accepted: false,
+      intent: currentIntent,
+      intentChanged: false,
+      rejectionReason: "General Listening is not a promotable session mood.",
       preferredArtists: [],
       preferredGenres: [],
     };

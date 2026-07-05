@@ -84,7 +84,7 @@ async def test_generator_uses_fallback_when_ai_fails() -> None:
         current_intent="indie focus",
     )
 
-    recommendations, candidate_count, used_ai = await generator.generate(
+    recommendations, candidate_count, used_ai, fallback_reason = await generator.generate(
         profile,
         query="indie focus",
         limit=1,
@@ -92,6 +92,8 @@ async def test_generator_uses_fallback_when_ai_fails() -> None:
 
     assert candidate_count == 1
     assert used_ai is False
+    assert fallback_reason is not None
+    assert "temporarily unavailable" in fallback_reason.lower()
     assert len(recommendations) == 1
     assert recommendations[0].track.id == "t1"
 
@@ -124,12 +126,13 @@ async def test_generator_filters_hallucinated_track_ids() -> None:
     generator = RecommendationGenerator(catalog, ai)
     profile = UserProfilePayload(genres=["indie"], current_intent="indie focus")
 
-    recommendations, _, used_ai = await generator.generate(
+    recommendations, _, used_ai, fallback_reason = await generator.generate(
         profile,
         query="indie focus",
         limit=5,
     )
 
     assert used_ai is True
+    assert fallback_reason is None
     assert len(recommendations) == 1
     assert recommendations[0].track.id == "t1"

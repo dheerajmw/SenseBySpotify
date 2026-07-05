@@ -1,6 +1,6 @@
 import type { LocalUserProfile, Recommendation, SessionAction } from "../types";
 import { getDiscoveryProfile, normalizeNoveltyTolerance } from "./discoveryLevel";
-import { INTENT_CONFIDENCE_THRESHOLD, OFF_GENRE_SUSTAINED_LISTEN_DECAY, SUSTAINED_LISTEN_CONFIDENCE_WEIGHT } from "./intentEvidence";
+import { INTENT_CONFIDENCE_THRESHOLD } from "./intentEvidence";
 import { parseReasonBullets } from "./music";
 
 export function formatRelativeTime(iso: string): string {
@@ -132,7 +132,7 @@ export function learningMessageForAction(type: SessionAction["type"]): string | 
     case "REPLAY":
       return "Strong signal recorded for mood detection";
     case "LISTENED_20S":
-      return `20+ seconds listened — +${SUSTAINED_LISTEN_CONFIDENCE_WEIGHT} if genre matches, otherwise −${OFF_GENRE_SUSTAINED_LISTEN_DECAY} points`;
+      return "20+ seconds listened — +10 toward candidate mood";
     case "FEEDBACK":
       return `Thanks — this helps Sense reach the ${INTENT_CONFIDENCE_THRESHOLD}-point mood threshold`;
     default:

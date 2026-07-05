@@ -1,21 +1,19 @@
 import type { SessionState } from "../types";
+import { GENERAL_LISTENING_INTENT } from "../constants/brand";
 import { intentsAlign } from "./intent";
 import {
   INTENT_CONFIDENCE_THRESHOLD,
   MEANINGFUL_INTERACTIONS_TARGET,
-  OFF_CANDIDATE_GENRE_PLAY_TARGET,
   remainingInteractionsNeeded,
-  SUSTAINED_LISTEN_CONFIDENCE_WEIGHT,
 } from "./intentEvidence";
-import { hasKnownIntent } from "./sessionLifecycle";
-import { searchCandidateDiffersFromCurrent } from "./searchCandidateIntent";
+import { getActiveIntent, isGeneralListeningIntent } from "./sessionLifecycle";
+import { formatResolvedIntentLabel } from "./userIntentInput";
 
 export interface IntentPredictionDisplay {
   currentIntent: string;
   predictedIntent: string | null;
   confidencePercent: number;
   thresholdPercent: number;
-  /** Visual fill 0–100 toward the switch threshold */
   meterFillPercent: number;
   pointsToThreshold: number;
   isPredictingChange: boolean;
@@ -23,60 +21,44 @@ export interface IntentPredictionDisplay {
   headline: string;
   subline: string;
   evidenceHint: string | null;
-  searchCandidateIntent: string | null;
-  searchCandidateConfidence: number | null;
-  searchCandidateQuery: string | null;
 }
 
 export function buildIntentPredictionDisplay(
   session: SessionState,
   options?: { isEvaluating?: boolean },
 ): IntentPredictionDisplay | null {
-  const currentIntent = hasKnownIntent(session.currentIntent)
-    ? session.currentIntent.trim()
-    : "";
-  if (!currentIntent) {
-    return null;
-  }
-
+  const currentIntent = getActiveIntent(session) || GENERAL_LISTENING_INTENT;
   const thresholdPercent = INTENT_CONFIDENCE_THRESHOLD;
-  const confidencePercent = Math.min(100, Math.round(session.intentConfidence));
-  const candidate = session.candidateIntent?.trim() || currentIntent;
-  const isPredictingChange =
-    Boolean(candidate) && !intentsAlign(currentIntent, candidate);
+  const candidate = session.candidateIntent?.trim() || null;
+  const isPredictingChange = Boolean(
+    candidate && session.currentIntent && !intentsAlign(session.currentIntent, candidate),
+  );
   const predictedIntent = isPredictingChange ? candidate : null;
+  const confidencePercent = Math.min(100, Math.round(session.candidateConfidence));
   const thresholdMet = confidencePercent >= thresholdPercent;
   const meterFillPercent = confidencePercent;
   const pointsToThreshold = Math.max(0, thresholdPercent - confidencePercent);
-  const searchExploring = searchCandidateDiffersFromCurrent(
-    session.searchCandidate,
-    currentIntent,
-  );
-  const searchCandidateIntent = searchExploring
-    ? session.searchCandidate!.intent
-    : null;
-  const searchCandidateConfidence = searchExploring
-    ? Math.min(100, Math.round(session.searchCandidate!.confidence))
-    : null;
-  const searchCandidateQuery = searchExploring
-    ? session.searchCandidate!.query
-    : null;
 
   let headline: string;
   let subline: string;
 
   if (options?.isEvaluating) {
     headline = "Reviewing your listening behaviour";
-    subline = `Sense checks whether your mood shifted. A new session intent only applies at ${thresholdPercent}% confidence or higher.`;
-  } else if (!isPredictingChange || confidencePercent >= 100) {
-    headline = currentIntent;
-    subline = `Your feed is tuned for this mood. Points add on play (+8) and 20s listens (+${SUSTAINED_LISTEN_CONFIDENCE_WEIGHT}) only when the song's genre fits the predicted intent (${thresholdPercent}-point threshold).`;
+    subline = `Sense checks whether your mood shifted. Session intent only changes at ${thresholdPercent} candidate points.`;
+  } else if (!isPredictingChange) {
+    const intentLabel = isGeneralListeningIntent(currentIntent)
+      ? GENERAL_LISTENING_INTENT
+      : formatResolvedIntentLabel(currentIntent, session.preferredGenres);
+    headline = intentLabel;
+    subline = isGeneralListeningIntent(currentIntent)
+      ? "Play and listen — Sense learns your mood from behaviour. Search never changes session intent."
+      : `Your feed is tuned for ${intentLabel}. Points come from plays (+5), 20s listens (+10), likes (+25), and skips (−15).`;
   } else if (thresholdMet) {
     headline = predictedIntent ?? currentIntent;
-    subline = `Predicted intent at ${confidencePercent}/${thresholdPercent} points — switch threshold met.`;
+    subline = `Candidate mood at ${confidencePercent}/${thresholdPercent} points — switch threshold met.`;
   } else {
     headline = predictedIntent ?? currentIntent;
-    subline = `Predicted mood shift from “${currentIntent}”. Off-genre plays retarget the candidate after ${OFF_CANDIDATE_GENRE_PLAY_TARGET} matching tracks. ${pointsToThreshold} more point${pointsToThreshold === 1 ? "" : "s"} needed (${confidencePercent}/${thresholdPercent}).`;
+    subline = `Watching a shift from “${currentIntent}”. ${pointsToThreshold} more point${pointsToThreshold === 1 ? "" : "s"} needed (${confidencePercent}/${thresholdPercent}).`;
   }
 
   const remaining = remainingInteractionsNeeded(session.interactionsCollected);
@@ -101,8 +83,5 @@ export function buildIntentPredictionDisplay(
     headline,
     subline,
     evidenceHint,
-    searchCandidateIntent,
-    searchCandidateConfidence,
-    searchCandidateQuery,
   };
 }

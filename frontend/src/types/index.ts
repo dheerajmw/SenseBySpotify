@@ -62,6 +62,7 @@ export interface GenerateRecommendationsResponse {
   recommendations: Recommendation[];
   candidate_count: number;
   used_ai: boolean;
+  fallback_reason?: string | null;
 }
 
 export interface Recommendation {
@@ -111,6 +112,7 @@ export type SessionActionType =
   | "SEARCH"
   | "PLAY"
   | "LISTENED_20S"
+  | "PREVIEW_COMPLETED"
   | "LIKE"
   | "UNLIKE"
   | "DISLIKE"
@@ -125,7 +127,7 @@ export interface SessionAction {
   timestamp: number;
 }
 
-/** Parallel mood hypothesis from manual search — separate from feed/listening candidate. */
+/** @deprecated Search no longer drives session intent — kept for persisted action logs. */
 export interface SearchCandidate {
   intent: string;
   confidence: number;
@@ -133,14 +135,33 @@ export interface SearchCandidate {
   lastActiveAt: string;
 }
 
+export interface IntentEvidenceEntry {
+  timestamp: number;
+  action: SessionActionType;
+  value: string;
+  delta: number;
+  candidateIntent: string | null;
+  candidateConfidenceAfter: number;
+  note: string;
+}
+
+export interface ConfidenceTimelineEntry {
+  timestamp: number;
+  candidateIntent: string | null;
+  candidateConfidence: number;
+  reason: string;
+}
+
 export interface SessionState {
   sessionId: string;
   createdAt: string;
   lastActive: string;
-  currentIntent: string;
-  candidateIntent: string;
+  currentIntent: string | null;
+  candidateIntent: string | null;
   intentConfidence: number;
-  searchCandidate: SearchCandidate | null;
+  candidateConfidence: number;
+  evidence: IntentEvidenceEntry[];
+  confidenceTimeline: ConfidenceTimelineEntry[];
   lastSearchQuery: string | null;
   preferredArtists: string[];
   preferredGenres: string[];
@@ -156,10 +177,12 @@ export interface SessionState {
   recommendationVersion: number;
   aiReason: string;
   intentDecision: string;
+  lastPromotionReason: string | null;
+  rejectedAiIntents: string[];
   lastIntentValidation: IntentValidationDebug | null;
   personalizedSecondSongUsed: boolean;
-  listeningShiftIntent: string | null;
-  listeningShiftPlayCount: number;
+  /** User explicitly chose session intent this visit (via prompt or establishSessionIntent). */
+  intentDeclaredThisSession: boolean;
 }
 
 export interface IntentValidationDebug {

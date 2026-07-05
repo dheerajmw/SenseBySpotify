@@ -1,16 +1,24 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiClientError } from "../api/client";
 import AIPromptInput from "./AIPromptInput";
-import { APP_NAME, INTENT_CHIPS } from "../constants/brand";
+import { INTENT_CHIPS } from "../constants/brand";
+import { useProfile } from "../contexts/ProfileContext";
 import { useSession } from "../hooks/useSession";
 
 export default function SessionIntentPrompt() {
   const navigate = useNavigate();
+  const { profile } = useProfile();
   const { needsIntentPrompt, establishSessionIntent, logAction } = useSession();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (needsIntentPrompt && profile.currentIntent.trim() && !query.trim()) {
+      setQuery(profile.currentIntent.trim());
+    }
+  }, [needsIntentPrompt, profile.currentIntent, query]);
 
   if (!needsIntentPrompt) {
     return null;
@@ -50,7 +58,7 @@ export default function SessionIntentPrompt() {
     >
       <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl sm:p-8">
         <p className="text-xs font-medium uppercase tracking-widest text-emerald-400">
-          New listening session
+          Start listening
         </p>
         <h2
           id="session-intent-prompt-title"
@@ -59,9 +67,8 @@ export default function SessionIntentPrompt() {
           What are you listening for today?
         </h2>
         <p className="mt-3 text-sm text-zinc-400">
-          {APP_NAME} keeps your taste profile, but each visit starts fresh. Tell us
-          what you want to hear right now and we&apos;ll build recommendations for
-          this session.
+          Tell us what you want to hear right now and we&apos;ll build recommendations
+          for this session. Each visit starts fresh — mood chips or your own words.
         </p>
 
         <div className="mt-5 flex flex-wrap gap-2">

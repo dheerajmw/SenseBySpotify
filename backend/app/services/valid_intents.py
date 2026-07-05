@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+GENERAL_LISTENING_INTENT = "General Listening"
+
 VALID_INTENTS: tuple[str, ...] = (
     "Focus",
     "Workout",

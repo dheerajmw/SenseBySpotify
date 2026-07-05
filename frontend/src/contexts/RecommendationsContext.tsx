@@ -21,6 +21,7 @@ interface StoredFeed {
   recommendations: Recommendation[];
   candidateCount: number;
   usedAi: boolean;
+  fallbackReason: string | null;
 }
 
 interface RecommendationsContextValue {
@@ -28,6 +29,7 @@ interface RecommendationsContextValue {
   recommendations: Recommendation[];
   candidateCount: number;
   usedAi: boolean;
+  fallbackReason: string | null;
   hasFeed: boolean;
   history: Recommendation[];
   trending: Track[];
@@ -84,6 +86,9 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
   );
   const [candidateCount, setCandidateCount] = useState(stored?.candidateCount ?? 0);
   const [usedAi, setUsedAi] = useState(stored?.usedAi ?? false);
+  const [fallbackReason, setFallbackReason] = useState<string | null>(
+    stored?.fallbackReason ?? null,
+  );
   const [history, setHistory] = useState<Recommendation[]>(loadHistory);
   const [trending, setTrending] = useState<Track[]>([]);
 
@@ -105,11 +110,13 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
     setRecommendations(response.recommendations);
     setCandidateCount(response.candidate_count);
     setUsedAi(response.used_ai);
+    setFallbackReason(response.used_ai ? null : (response.fallback_reason ?? null));
     persistFeed({
       query: response.query,
       recommendations: response.recommendations,
       candidateCount: response.candidate_count,
       usedAi: response.used_ai,
+      fallbackReason: response.used_ai ? null : (response.fallback_reason ?? null),
     });
     setHistory((current) => {
       const merged = [...response.recommendations, ...current];
@@ -145,17 +152,19 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
           recommendations: next,
           candidateCount,
           usedAi,
+          fallbackReason,
         });
       }
       return next;
     });
-  }, [query, candidateCount, usedAi]);
+  }, [query, candidateCount, usedAi, fallbackReason]);
 
   const clearFeed = useCallback(() => {
     setQuery(null);
     setRecommendations([]);
     setCandidateCount(0);
     setUsedAi(false);
+    setFallbackReason(null);
     persistFeed(null);
   }, []);
 
@@ -165,6 +174,7 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
       recommendations,
       candidateCount,
       usedAi,
+      fallbackReason,
       hasFeed: recommendations.length > 0,
       history,
       trending,
@@ -178,6 +188,7 @@ export function RecommendationsProvider({ children }: { children: ReactNode }) {
       recommendations,
       candidateCount,
       usedAi,
+      fallbackReason,
       history,
       trending,
       setFeed,

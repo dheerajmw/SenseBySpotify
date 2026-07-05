@@ -7,6 +7,7 @@ import { usePlayer } from "../contexts/PlayerContext";
 import { useRecommendations } from "../contexts/RecommendationsContext";
 import { useFeedback } from "../hooks/useFeedback";
 import { useSession } from "../hooks/useSession";
+import { buildRecommendationRequest } from "../utils/recommendationContext";
 import type { FeedbackChip } from "../types";
 import { formatConfidence, formatDuration, parseReasonBullets } from "../utils/music";
 import { trackLabel } from "../utils/track";
@@ -20,17 +21,23 @@ export default function RecommendationDetails() {
   const [showLikePopup, setShowLikePopup] = useState(false);
   const recommendation = id ? getRecommendation(id) : undefined;
 
+  const { logAction, session } = useSession();
+
   const regenerate = useCallback(async () => {
     if (!query) {
       return;
     }
     const { api } = await import("../api/client");
-    const response = await api.generateRecommendations(profile, query);
+    const { query: recommendationQuery, profile: requestProfile } =
+      buildRecommendationRequest(profile, session);
+    const response = await api.generateRecommendations(
+      requestProfile,
+      recommendationQuery || query,
+    );
     setFeed(response);
-  }, [profile, query, setFeed]);
+  }, [profile, query, session, setFeed]);
 
   const { sendFeedback, toggleLike, toggleDislike } = useFeedback(regenerate);
-  const { logAction } = useSession();
 
   useEffect(() => {
     if (!recommendation) {

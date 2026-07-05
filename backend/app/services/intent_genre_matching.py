@@ -4,11 +4,13 @@ import re
 
 from app.models.track import Track
 from app.services.session_intent_validation import extract_intent_from_text
-from app.services.valid_intents import GENRE_LABELS, is_genre_label, normalize_text
+from app.services.valid_intents import GENRE_LABELS, GENERAL_LISTENING_INTENT, is_genre_label, normalize_text
 
 # iTunes-friendly genre search terms (primaryGenreName clusters)
 INTENT_KEYWORD_TO_GENRES: dict[str, list[str]] = {
     "hindi": ["Indian Pop", "Bollywood", "Indian"],
+    "urdu": ["Indian Pop", "Bollywood", "World"],
+    "shayari": ["Indian Pop", "Bollywood", "World"],
     "bollywood": ["Bollywood", "Indian Pop", "Indian"],
     "punjabi": ["Punjabi", "Indian Pop", "Indian"],
     "tamil": ["Tamil", "Indian Pop", "Indian"],
@@ -38,6 +40,24 @@ INTENT_KEYWORD_TO_GENRES: dict[str, list[str]] = {
     "bhajan": ["Indian Pop", "Devotional", "World"],
     "sufi": ["Indian Pop", "World", "Singer/Songwriter"],
 }
+
+PREFERRED_GENRE_TO_ITUNES: dict[str, list[str]] = {
+    "hindi": ["Indian Pop", "Bollywood", "Indian"],
+    "urdu": ["Indian Pop", "Bollywood", "World"],
+    "bollywood": ["Bollywood", "Indian Pop", "Indian"],
+    "punjabi": ["Punjabi", "Indian Pop", "Indian"],
+    "tamil": ["Tamil", "Indian Pop", "Indian"],
+    "telugu": ["Telugu", "Indian Pop", "Indian"],
+    "ghazal": ["Indian Pop", "World", "Singer/Songwriter"],
+    "shayari": ["Indian Pop", "Bollywood", "World"],
+    "sufi": ["Indian Pop", "World", "Devotional"],
+    "devotional": ["Devotional", "Indian Pop", "World"],
+    "bhajan": ["Devotional", "Indian Pop", "World"],
+}
+
+MOODS_OVERRIDDEN_BY_CULTURAL_GENRES = frozenset(
+    {"Reading", "Study", "Focus", "Calm", "Relaxing", "Meditation"},
+)
 
 MOOD_INTENT_TO_GENRES: dict[str, list[str]] = {
     "Workout": ["Pop", "Hip-Hop/Rap", "Dance", "Electronic"],
@@ -86,11 +106,53 @@ def _dedupe_preserve_order(items: list[str]) -> list[str]:
     return result
 
 
-def resolve_target_genres(intent: str, profile_genres: list[str]) -> list[str]:
-    """Map listening intent + profile taste to iTunes genre targets."""
+def _map_preferred_genres_to_itunes(preferred_genres: list[str]) -> list[str]:
+    mapped: list[str] = []
+    for label in preferred_genres:
+        normalized = normalize_text(label)
+        if not normalized:
+            continue
+        if normalized in PREFERRED_GENRE_TO_ITUNES:
+            mapped.extend(PREFERRED_GENRE_TO_ITUNES[normalized])
+            continue
+        formatted = _title_case_genre(label)
+        if formatted:
+            mapped.append(formatted)
+    return mapped
+
+
+def _keyword_genres_from_text(normalized_intent: str) -> list[str]:
     targets: list[str] = []
+    if not normalized_intent:
+        return targets
+
+    for keyword, genres in sorted(
+        INTENT_KEYWORD_TO_GENRES.items(),
+        key=lambda item: -len(item[0]),
+    ):
+        if keyword in normalized_intent:
+            targets.extend(genres)
+
+    for genre_label in GENRE_LABELS:
+        if genre_label in normalized_intent:
+            targets.append(_title_case_genre(genre_label))
+    return targets
+
+
+def resolve_target_genres(
+    intent: str,
+    profile_genres: list[str],
+    preferred_genres: list[str] | None = None,
+) -> list[str]:
+    """Map listening intent + profile taste to iTunes genre targets."""
+    session_preferred = preferred_genres or []
     trimmed = intent.strip()
     normalized_intent = normalize_text(trimmed)
+    targets: list[str] = []
+
+    cultural_targets = _map_preferred_genres_to_itunes(session_preferred)
+    keyword_targets = _keyword_genres_from_text(normalized_intent)
+    has_cultural_signal = bool(cultural_targets or keyword_targets)
 
     for genre in profile_genres:
         formatted = _title_case_genre(genre)
@@ -100,21 +162,19 @@ def resolve_target_genres(intent: str, profile_genres: list[str]) -> list[str]:
     if trimmed and is_genre_label(trimmed):
         targets.append(_title_case_genre(trimmed))
 
+    if cultural_targets:
+        targets.extend(cultural_targets)
+
+    if keyword_targets:
+        targets.extend(keyword_targets)
+
     canonical = extract_intent_from_text(trimmed)
     if canonical and canonical in MOOD_INTENT_TO_GENRES:
-        targets.extend(MOOD_INTENT_TO_GENRES[canonical])
+        if not (has_cultural_signal and canonical in MOODS_OVERRIDDEN_BY_CULTURAL_GENRES):
+            targets.extend(MOOD_INTENT_TO_GENRES[canonical])
 
-    if normalized_intent:
-        for keyword, genres in sorted(
-            INTENT_KEYWORD_TO_GENRES.items(),
-            key=lambda item: -len(item[0]),
-        ):
-            if keyword in normalized_intent:
-                targets.extend(genres)
-
-        for genre_label in GENRE_LABELS:
-            if genre_label in normalized_intent:
-                targets.append(_title_case_genre(genre_label))
+    if trimmed and normalize_text(trimmed) == normalize_text(GENERAL_LISTENING_INTENT):
+        return _dedupe_preserve_order([_title_case_genre(genre) for genre in profile_genres[:4]]) or ["Pop"]
 
     if not targets and trimmed:
         tokens = [token for token in re.split(r"[^\w&]+", normalized_intent) if len(token) > 2]
@@ -129,14 +189,22 @@ def build_genre_first_search_queries(
     intent: str,
     profile_genres: list[str],
     favourite_artists: list[str],
+    preferred_genres: list[str] | None = None,
 ) -> list[str]:
     """Build iTunes queries that discover by genre/mood, not song-title keywords."""
-    target_genres = resolve_target_genres(intent, profile_genres)
+    target_genres = resolve_target_genres(intent, profile_genres, preferred_genres)
     queries: list[str] = []
 
     for genre in target_genres:
         queries.append(genre)
         queries.append(f"{genre} music")
+
+    session_preferred = preferred_genres or []
+    for label in session_preferred[:3]:
+        normalized = normalize_text(label)
+        mapped = PREFERRED_GENRE_TO_ITUNES.get(normalized, [])
+        for genre in mapped[:2]:
+            queries.append(f"{genre} {label}".strip())
 
     canonical = extract_intent_from_text(intent)
     if canonical and canonical in MOOD_INTENT_TO_GENRES:

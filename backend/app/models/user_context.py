@@ -43,6 +43,7 @@ class UserContext(BaseModel):
     recently_played: list[Track] = Field(default_factory=list)
     top_artists: list[Artist] = Field(default_factory=list)
     top_genres: list[str] = Field(default_factory=list)
+    preferred_genres: list[str] = Field(default_factory=list)
     liked_songs: list[Track] = Field(default_factory=list)
     first_search: str | None = None
     current_query: str | None = None

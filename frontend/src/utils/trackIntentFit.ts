@@ -1,5 +1,6 @@
 import type { Track } from "../types";
-import { extractIntentFromText, VALID_INTENTS, type ValidIntent } from "./intentValidation";
+import { canonicalIntent, extractIntentFromText, VALID_INTENTS, type ValidIntent } from "./intentValidation";
+import { intentsAlign } from "./intent";
 
 const INTENT_KEYWORD_TO_GENRES: Record<string, string[]> = {
   hindi: ["Indian Pop", "Bollywood", "Indian"],
@@ -187,6 +188,31 @@ export function scoreTrackGenreFit(
   return Math.round(best * 1000) / 1000;
 }
 
+/** True when two moods share overlapping iTunes genre targets (e.g. Pop-family tracks). */
+export function intentsShareGenreCluster(
+  left: string,
+  right: string,
+  profileGenres: string[] = [],
+): boolean {
+  if (intentsAlign(left, right)) {
+    return true;
+  }
+  const leftGenres = resolveTargetGenres(left, profileGenres).map(normalizeGenre);
+  const rightGenres = resolveTargetGenres(right, profileGenres).map(normalizeGenre);
+  for (const leftGenre of leftGenres) {
+    for (const rightGenre of rightGenres) {
+      if (
+        leftGenre === rightGenre ||
+        leftGenre.includes(rightGenre) ||
+        rightGenre.includes(leftGenre)
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function trackMatchesPredictedIntent(
   track: Track,
   predictedIntent: string,
@@ -208,6 +234,7 @@ export function trackMatchesPredictedIntent(
 export function inferIntentFromTrack(
   track: Track,
   profileGenres: string[],
+  preferredIntent?: string,
 ): ValidIntent | null {
   let bestIntent: ValidIntent | null = null;
   let bestScore = 0;
@@ -218,6 +245,27 @@ export function inferIntentFromTrack(
     if (score >= TRACK_INTENT_MATCH_MIN_SCORE && score > bestScore) {
       bestScore = score;
       bestIntent = intent;
+    }
+  }
+
+  if (preferredIntent) {
+    const preferred =
+      extractIntentFromText(preferredIntent) ??
+      canonicalIntent(preferredIntent);
+    if (preferred) {
+      const preferredScore = scoreTrackGenreFit(
+        track,
+        resolveTargetGenres(preferred, profileGenres),
+        preferred,
+      );
+      if (
+        preferredScore >= TRACK_INTENT_MATCH_MIN_SCORE &&
+        (!bestIntent ||
+          intentsShareGenreCluster(preferred, bestIntent, profileGenres) ||
+          preferredScore >= bestScore)
+      ) {
+        return preferred as ValidIntent;
+      }
     }
   }
 

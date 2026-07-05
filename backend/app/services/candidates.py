@@ -5,6 +5,7 @@ import logging
 from app.models.track import Track
 from app.models.user_context import UserContext
 from app.schemas.user_profile import UserProfilePayload
+from app.services.candidate_expansion import expand_candidates_if_needed
 from app.services.intent_genre_matching import (
     build_genre_first_search_queries,
     resolve_target_genres,
@@ -25,6 +26,7 @@ def build_search_queries(context: UserContext, prompt: str) -> list[str]:
         prompt,
         context.top_genres,
         favourite_artists,
+        context.preferred_genres,
     )
 
 
@@ -41,7 +43,11 @@ async def fetch_candidates(
     max_candidates: int = MAX_CANDIDATES,
 ) -> list[Track]:
     excluded_ids = _excluded_track_ids(profile)
-    target_genres = resolve_target_genres(prompt, list(profile.genres))
+    target_genres = resolve_target_genres(
+        prompt,
+        list(profile.genres),
+        list(profile.preferred_genres),
+    )
     queries = build_search_queries(context, prompt)
 
     candidates: list[Track] = []
@@ -80,6 +86,16 @@ async def fetch_candidates(
                 candidates.append(track)
                 if len(candidates) >= max_candidates:
                     break
+
+    candidates = await expand_candidates_if_needed(
+        catalog,
+        prompt=prompt,
+        candidates=candidates,
+        seen_ids=seen_ids,
+        excluded_ids=excluded_ids,
+        max_candidates=max_candidates,
+        search_limit=SEARCH_LIMIT,
+    )
 
     ranked = sort_tracks_by_genre_fit(candidates, target_genres, prompt)
     return ranked[:max_candidates]

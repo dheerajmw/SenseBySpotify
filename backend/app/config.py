@@ -23,9 +23,17 @@ class Settings(BaseSettings):
         default="gpt-oss-120b",
         validation_alias=AliasChoices("LLM_MODEL", "OPENAI_MODEL"),
     )
+    llm_fallback_model: str = Field(
+        default="gemma-4-31b",
+        validation_alias=AliasChoices("LLM_FALLBACK_MODEL"),
+    )
     llm_timeout_seconds: float = Field(
         default=30.0,
         validation_alias=AliasChoices("LLM_TIMEOUT_SECONDS", "OPENAI_TIMEOUT_SECONDS"),
+    )
+    llm_retry_backoff_seconds: float = Field(
+        default=1.5,
+        validation_alias=AliasChoices("LLM_RETRY_BACKOFF_SECONDS"),
     )
     environment: str = "development"
     log_level: str = "INFO"

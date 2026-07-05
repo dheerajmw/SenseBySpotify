@@ -201,6 +201,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         }
       };
       audio.onended = () => {
+        if (
+          currentTrackRef.current &&
+          sustainedListenAwardedTrackIdRef.current === currentTrackRef.current.id
+        ) {
+          logActionRef.current("PREVIEW_COMPLETED", trackLabel(currentTrackRef.current), {
+            track: currentTrackRef.current,
+            queueSource: queueSourceRef.current,
+          });
+        }
         setIsPlaying(false);
         setProgress(0);
         setCurrentTime(0);

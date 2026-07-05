@@ -58,6 +58,7 @@ class UserContextBuilder:
             recently_played=[],
             top_artists=top_artists,
             top_genres=list(profile.genres),
+            preferred_genres=list(profile.preferred_genres),
             liked_songs=[],
             first_search=query or None,
             current_query=query or None,

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import logging
-
 from app.models.recommendation import Recommendation
 from app.models.track import Track
 from app.schemas.user_profile import UserProfilePayload
 from app.services.ai.base import RankedTrackResult
 from app.services.ai.openai_provider import OpenAIProvider
+from app.services.ai_ranking import rank_with_ai_or_fallback
 from app.services.candidates import fetch_candidates
 from app.services.context_builder import UserContextBuilder
 from app.services.intent_genre_matching import (
@@ -15,8 +14,6 @@ from app.services.intent_genre_matching import (
     sort_tracks_by_genre_fit,
 )
 from app.services.music_catalog import MusicCatalogClient
-
-logger = logging.getLogger(__name__)
 
 MAX_PER_ARTIST = 2
 
@@ -27,8 +24,13 @@ def fallback_rank(
     limit: int,
     *,
     profile_genres: list[str] | None = None,
+    preferred_genres: list[str] | None = None,
 ) -> list[RankedTrackResult]:
-    target_genres = resolve_target_genres(query, profile_genres or [])
+    target_genres = resolve_target_genres(
+        query,
+        profile_genres or [],
+        preferred_genres or [],
+    )
     sorted_tracks = sort_tracks_by_genre_fit(candidates, target_genres, query)
     results: list[RankedTrackResult] = []
     for index, track in enumerate(sorted_tracks[:limit], start=1):
@@ -103,7 +105,7 @@ class RecommendationGenerator:
         *,
         query: str,
         limit: int = 10,
-    ) -> tuple[list[Recommendation], int, bool]:
+    ) -> tuple[list[Recommendation], int, bool, str | None]:
         context = self._context_builder.build(profile, current_query=query)
         candidates = await fetch_candidates(
             self._catalog,
@@ -113,25 +115,21 @@ class RecommendationGenerator:
         )
 
         if not candidates:
-            return [], 0, False
+            return [], 0, False, None
 
         tracks_by_id = {track.id: track for track in candidates}
-        used_ai = True
 
-        try:
-            ranked = await self._ai.rank_tracks(
-                context=context,
-                query=query,
-                candidates=candidates,
-                limit=limit,
-            )
-            ranked = self._validate_ranked(ranked, tracks_by_id)
-            if not ranked:
-                raise ValueError("AI returned no valid track IDs")
-        except Exception as exc:
-            logger.warning("AI ranking failed, using fallback: %s", exc)
-            used_ai = False
-            ranked = fallback_rank(candidates, query, limit, profile_genres=list(profile.genres))
+        ranked, used_ai, fallback_reason = await rank_with_ai_or_fallback(
+            self._ai,
+            context=context,
+            query=query,
+            candidates=candidates,
+            limit=limit,
+            profile_genres=list(profile.genres),
+            preferred_genres=list(profile.preferred_genres),
+            tracks_by_id=tracks_by_id,
+            validate_ranked=self._validate_ranked,
+        )
 
         ranked = apply_artist_diversity(ranked, tracks_by_id, limit)
 
@@ -149,7 +147,7 @@ class RecommendationGenerator:
                 )
             )
 
-        return recommendations, len(candidates), used_ai
+        return recommendations, len(candidates), used_ai, fallback_reason
 
     def _validate_ranked(
         self,

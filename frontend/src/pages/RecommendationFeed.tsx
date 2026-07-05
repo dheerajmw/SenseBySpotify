@@ -12,6 +12,7 @@ import { useRecommendations } from "../contexts/RecommendationsContext";
 import { useFeedback } from "../hooks/useFeedback";
 import { useSkipRecommendation } from "../hooks/useSkipRecommendation";
 import { useSession } from "../hooks/useSession";
+import { buildRecommendationRequest } from "../utils/recommendationContext";
 import { getActiveIntent } from "../utils/sessionLifecycle";
 import type { FeedbackChip, Recommendation } from "../types";
 
@@ -42,9 +43,11 @@ export default function RecommendationFeed() {
     }
     setRefreshing(true);
     try {
+      const { query: recommendationQuery, profile: requestProfile } =
+        buildRecommendationRequest(profile, session, intent);
       const response = await api.generateRecommendations(
-        { ...profile, currentIntent: intent },
-        intent,
+        requestProfile,
+        recommendationQuery,
       );
       setFeed(response);
     } finally {

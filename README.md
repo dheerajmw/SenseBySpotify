@@ -27,11 +27,10 @@ Open **http://127.0.0.1:5173**
 
 ## App flow
 
-1. **Welcome** — Get Started
-2. **Onboarding** — Genres → Artists (iTunes search) → Discovery style → Intent
-3. **Home** — Greeting, recommendations, trending, history
-4. **AI Discovery** — Natural-language prompt → iTunes candidates → OpenAI ranking
-5. **Feed** — Recommendation cards with preview, explanations, and local feedback
+1. **Welcome** — Get Started (no multi-step wizard)
+2. **Session intent prompt** — mood chips or free text → recommendations → Feed *(only onboarding input)*
+3. **Home / Feed / Search / AI Discovery** — browse, listen, feedback
+4. **Session learning** — mood adapts from listening; new tab or 2h idle → prompt again
 
 ## API
 

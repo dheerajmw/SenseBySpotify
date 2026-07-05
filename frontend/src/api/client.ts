@@ -49,7 +49,7 @@ export async function apiRequest<T>(
   return response.json() as Promise<T>;
 }
 
-function toProfilePayload(profile: LocalUserProfile) {
+function toProfilePayload(profile: LocalUserProfile & { preferredGenres?: string[] }) {
   return {
     genres: profile.genres,
     favourite_artists: profile.favouriteArtists.map((artist) => ({
@@ -59,6 +59,7 @@ function toProfilePayload(profile: LocalUserProfile) {
     })),
     novelty_tolerance: profile.noveltyTolerance,
     current_intent: profile.currentIntent,
+    preferred_genres: profile.preferredGenres ?? [],
     onboarding_completed: profile.onboardingCompleted,
     feedback_events: profile.feedbackEvents,
     liked_track_ids: profile.likedTrackIds,
@@ -82,7 +83,7 @@ export const api = {
   },
 
   generateRecommendations(
-    profile: LocalUserProfile,
+    profile: LocalUserProfile & { preferredGenres?: string[] },
     query: string,
     limit = 10,
   ): Promise<GenerateRecommendationsResponse> {

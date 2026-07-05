@@ -1,0 +1,191 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="2480" viewBox="0 0 1280 2480">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#374151"/>
+    </marker>
+    <style>
+      .doc-title { font: 700 28px system-ui, sans-serif; fill: #111827; }
+      .doc-h3 { font: 700 18px system-ui, sans-serif; fill: #111827; }
+      .subtitle { font: 400 13px system-ui, sans-serif; fill: #6B7280; }
+      .box { fill: #FFFFFF; stroke: #D1D5DB; stroke-width: 1.5; }
+      .route { fill: #FFFFFF; stroke: #22C55E; stroke-width: 1.5; }
+      .decision { fill: #FFFBEB; stroke: #F59E0B; stroke-width: 1.5; }
+      .label { font: 600 13px system-ui, sans-serif; fill: #111827; }
+      .small { font: 400 11px system-ui, sans-serif; fill: #4B5563; }
+      .edge { font: 500 11px system-ui, sans-serif; fill: #6B7280; }
+      .line { stroke: #374151; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #6B7280; stroke-width: 1.8; fill: none; stroke-dasharray: 8 5; marker-end: url(#arrow); }
+      .connector { stroke: #374151; stroke-width: 1.5; fill: none; }
+      .th { font: 700 13px system-ui, sans-serif; fill: #111827; }
+      .td { font: 400 12px system-ui, sans-serif; fill: #374151; }
+      .td-bold { font: 700 12px system-ui, sans-serif; fill: #111827; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="2480" fill="#FFFFFF"/>
+
+  <text x="640" y="48" text-anchor="middle" class="doc-title">Section 2 - Product Flow</text>
+  <text x="640" y="78" text-anchor="middle" class="doc-h3">Complete User Journey</text>
+  <text x="640" y="100" text-anchor="middle" class="subtitle">Strict match to project-bible.md mermaid flowchart</text>
+
+  <!-- A: Splash 1.2s -->
+  <rect x="540" y="120" width="200" height="40" rx="8" class="box"/>
+  <text x="640" y="146" text-anchor="middle" class="label">Splash 1.2s</text>
+  <path d="M640 160 L640 188" class="line"/>
+
+  <!-- B: onboardingCompleted? -->
+  <polygon points="640,188 710,228 640,268 570,228" class="decision"/>
+  <text x="640" y="232" text-anchor="middle" class="small">onboardingCompleted?</text>
+
+  <!-- No: /welcome -> Get Started -> /home Layout -->
+  <path d="M570 228 L280 228 L280 288" class="line"/>
+  <text x="300" y="220" class="edge">No</text>
+  <polygon points="280,288 360,308 280,328 200,308" class="route"/>
+  <text x="280" y="312" text-anchor="middle" class="small">/welcome</text>
+  <path d="M280 328 L280 368" class="line"/>
+  <rect x="120" y="368" width="320" height="40" rx="8" class="box"/>
+  <text x="280" y="394" text-anchor="middle" class="small">Get Started - mark onboarded</text>
+  <path d="M280 408 L280 468 L560 468" class="line"/>
+
+  <!-- Yes -> /home Layout (right vertex) -->
+  <path d="M710 228 L1020 228 L1020 468 L720 468" class="line"/>
+  <text x="730" y="220" class="edge">Yes</text>
+
+  <!-- H: /home Layout -->
+  <polygon points="640,448 720,468 640,488 560,468" class="route"/>
+  <text x="640" y="472" text-anchor="middle" class="small">/home Layout</text>
+  <path d="M640 488 L640 516" class="line"/>
+
+  <!-- C: intentDeclaredThisSession? -->
+  <polygon points="640,516 720,560 640,604 560,560" class="decision"/>
+  <text x="640" y="556" text-anchor="middle" class="small">intentDeclaredThisSession?</text>
+
+  <!-- No: modal chain -->
+  <path d="M560 560 L280 560 L280 620" class="line"/>
+  <text x="300" y="552" class="edge">No - first load, new tab, 2h idle</text>
+  <rect x="80" y="620" width="400" height="40" rx="8" class="box"/>
+  <text x="280" y="646" text-anchor="middle" class="small">Blocking SessionIntentPrompt modal</text>
+  <path d="M280 660 L280 700" class="line"/>
+  <rect x="120" y="700" width="320" height="40" rx="8" class="box"/>
+  <text x="280" y="726" text-anchor="middle" class="small">Chips or free text</text>
+  <path d="M280 740 L280 780" class="line"/>
+  <rect x="120" y="780" width="320" height="40" rx="8" class="box"/>
+  <text x="280" y="806" text-anchor="middle" class="small">Parse mood + genres</text>
+  <path d="M280 820 L280 860" class="line"/>
+  <rect x="120" y="860" width="320" height="40" rx="8" class="box"/>
+  <text x="280" y="886" text-anchor="middle" class="small">Generate recommendations</text>
+  <path d="M280 900 L280 940" class="line"/>
+  <polygon points="280,940 360,960 280,980 200,960" class="route"/>
+  <text x="280" y="964" text-anchor="middle" class="small">/feed</text>
+  <path d="M280 980 L280 1020 L560 1020" class="line"/>
+
+  <!-- Yes -> Browse app -->
+  <path d="M720 560 L960 560 L960 1020 L720 1020" class="line"/>
+  <text x="730" y="552" class="edge">Yes - same tab refresh</text>
+
+  <!-- APP: Browse app - restore session -->
+  <rect x="480" y="1020" width="320" height="40" rx="8" class="box"/>
+  <text x="640" y="1046" text-anchor="middle" class="label">Browse app - restore session</text>
+  <path d="M640 1060 L640 1100" class="line"/>
+
+  <!-- L: Play previews -->
+  <rect x="460" y="1100" width="360" height="40" rx="8" class="box"/>
+  <text x="640" y="1126" text-anchor="middle" class="label">Play previews - log actions</text>
+  <path d="M640 1140 L640 1178" class="line"/>
+
+  <!-- D: candidateConfidence >= 75? -->
+  <polygon points="640,1178 720,1222 640,1266 560,1222" class="decision"/>
+  <text x="640" y="1226" text-anchor="middle" class="small">candidateConfidence &gt;= 75?</text>
+
+  <!-- Yes -->
+  <path d="M720 1222 L920 1222 L920 1300" class="line"/>
+  <text x="730" y="1214" class="edge">Yes</text>
+  <rect x="760" y="1300" width="320" height="40" rx="8" class="box"/>
+  <text x="920" y="1326" text-anchor="middle" class="small">Intent switch modal + feed refresh</text>
+
+  <!-- No -->
+  <path d="M560 1222 L360 1222 L360 1300" class="line"/>
+  <text x="380" y="1214" class="edge">No</text>
+  <rect x="200" y="1300" width="320" height="40" rx="8" class="box"/>
+  <text x="360" y="1326" text-anchor="middle" class="small">Continue current mood</text>
+
+  <!-- LOOP -->
+  <path d="M360 1340 L360 1380" class="line"/>
+  <path d="M920 1340 L920 1380" class="line"/>
+  <path d="M360 1380 L920 1380" class="connector"/>
+  <path d="M640 1380 L640 1400" class="line"/>
+  <rect x="420" y="1400" width="440" height="40" rx="8" class="box"/>
+  <text x="640" y="1426" text-anchor="middle" class="label">Autoplay, feedback, discovery slider</text>
+  <path d="M640 1440 L640 1478" class="line"/>
+
+  <!-- R: New tab or idle > 2h? -->
+  <polygon points="640,1478 720,1522 640,1566 560,1522" class="decision"/>
+  <text x="640" y="1520" text-anchor="middle" class="small">New tab or idle &gt; 2h?</text>
+
+  <!-- Yes -> NS -> C -->
+  <path d="M720 1522 L920 1522 L920 1600" class="line"/>
+  <text x="730" y="1514" class="edge">Yes</text>
+  <rect x="760" y="1600" width="320" height="40" rx="8" class="box"/>
+  <text x="920" y="1626" text-anchor="middle" class="small">New session - clear feed</text>
+  <path d="M920 1640 L920 1660 L1150 1660 L1150 560 L720 560" class="dash"/>
+  <text x="1160" y="1110" class="edge" transform="rotate(90 1160 1110)">Yes - loop to intent gate</text>
+
+  <!-- No -> L (loop back to play previews) -->
+  <path d="M560 1522 L100 1522 L100 1120 L460 1120" class="dash"/>
+  <text x="480" y="1514" class="edge">No</text>
+
+  <!-- Step-by-Step table -->
+  <text x="56" y="1740" class="doc-h3">Step-by-Step</text>
+
+  <rect x="56" y="1760" width="1168" height="36" rx="6" fill="#FFFFFF" stroke="#D1D5DB"/>
+  <text x="80" y="1782" class="th">Step</text>
+  <text x="220" y="1782" class="th">What happens</text>
+  <line x1="200" y1="1760" x2="200" y2="2316" stroke="#E5E7EB"/>
+
+  <rect x="56" y="1796" width="1168" height="52" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="1826" class="td-bold">1. Splash</text>
+  <text x="220" y="1826" class="td">1.2s overlay on any route.</text>
+
+  <rect x="56" y="1848" width="1168" height="52" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="1878" class="td-bold">2. Profile gate</text>
+  <text x="220" y="1878" class="td">If onboardingCompleted is false -&gt; /welcome. If true -&gt; / redirects to /home.</text>
+
+  <rect x="56" y="1900" width="1168" height="52" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="1930" class="td-bold">3. Welcome (once)</text>
+  <text x="220" y="1930" class="td">Get Started sets onboardingCompleted: true in localStorage and navigates to /home. No other inputs.</text>
+
+  <rect x="56" y="1952" width="1168" height="68" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="1982" class="td-bold">4. Intent gate (blocking)</text>
+  <text x="220" y="1982" class="td">On Layout pages, if !intentDeclaredThisSession -&gt; full-screen SessionIntentPrompt overlays /home.</text>
+  <text x="220" y="2002" class="td">User cannot browse Home/Feed/Search until they submit. Triggers: first visit after welcome, new tab, or 2h idle.</text>
+
+  <rect x="56" y="2020" width="1168" height="52" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="2050" class="td-bold">5. Declare intent</text>
+  <text x="220" y="2050" class="td">Mood chips or free text -&gt; parse canonical mood + genres -&gt; POST /generate-recommendations -&gt; /feed.</text>
+
+  <rect x="56" y="2072" width="1168" height="52" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="2102" class="td-bold">6. Same-tab refresh</text>
+  <text x="220" y="2102" class="td">Restores session + feed from sessionStorage -&gt; no modal if intent already declared.</text>
+
+  <rect x="56" y="2124" width="1168" height="52" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="2154" class="td-bold">7. Main app</text>
+  <text x="220" y="2154" class="td">Nav: Home, Feed, Search, AI Discovery, Now Playing. Player bar + global search always available.</text>
+
+  <rect x="56" y="2176" width="1168" height="68" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="2206" class="td-bold">8. Listening loop</text>
+  <text x="220" y="2206" class="td">Previews log PLAY / LISTENED_20S / LIKE / SKIP. Search seeds candidate (+12) only -</text>
+  <text x="220" y="2226" class="td">never overwrites committed mood.</text>
+
+  <rect x="56" y="2244" width="1168" height="68" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="2274" class="td-bold">9. Mood shift (behaviour)</text>
+  <text x="220" y="2274" class="td">When candidateConfidence &gt;= 75 from listening -&gt; IntentChangeModal -&gt; feed refresh.</text>
+  <text x="220" y="2294" class="td">Separate from initial declare-intent.</text>
+
+  <rect x="56" y="2312" width="1168" height="52" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="2342" class="td-bold">10. Session reset</text>
+  <text x="220" y="2342" class="td">New tab or 2h idle -&gt; fresh session, feed cleared -&gt; back to step 4 (modal on /home).</text>
+
+  <rect x="56" y="2364" width="1168" height="52" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="80" y="2394" class="td-bold">11. Re-declare (optional)</text>
+  <text x="220" y="2394" class="td">AI Discovery page runs the same establishSessionIntent flow anytime -&gt; /feed.</text>
+</svg>

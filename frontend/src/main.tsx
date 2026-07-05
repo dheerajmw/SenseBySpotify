@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import AiFallbackBanner from "./components/AiFallbackBanner";
 import AutoplayController from "./components/AutoplayController";
 import DiscoveryChangeModal from "./components/DiscoveryChangeModal";
 import IntentChangeModal from "./components/IntentChangeModal";
@@ -28,6 +29,7 @@ createRoot(document.getElementById("root")!).render(
               <IntentChangeModal />
               <DiscoveryChangeModal />
               <LearningNotification />
+              <AiFallbackBanner />
               <IntentToast />
               <SessionDebugger />
             </PlayerProvider>

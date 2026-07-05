@@ -31,6 +31,17 @@ def test_resolve_target_genres_for_workout() -> None:
     assert any(genre in {"Dance", "Hip-Hop/Rap", "Electronic"} for genre in genres)
 
 
+def test_resolve_target_genres_for_reading_with_hindi_urdu_preferences() -> None:
+    genres = resolve_target_genres(
+        "Reading",
+        ["Pop"],
+        preferred_genres=["Hindi", "Urdu"],
+    )
+    assert "Indian Pop" in genres or "Bollywood" in genres
+    assert "Classical" not in genres
+    assert "Jazz" not in genres
+
+
 def test_build_genre_first_search_queries_avoids_raw_intent_title() -> None:
     queries = build_genre_first_search_queries("hindi poetry", ["Bollywood"], [])
     assert "hindi poetry" not in queries

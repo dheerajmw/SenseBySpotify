@@ -40,7 +40,9 @@ export const PROFILE_STORAGE_KEY = "sense_profile";
 export const FEED_STORAGE_KEY = "sense_feed";
 export const HISTORY_STORAGE_KEY = "sense_recommendation_history";
 export const SESSION_STORAGE_KEY = "sense_session";
+export const SESSION_VISIT_KEY = "sense_session_visit";
 export const UNKNOWN_SESSION_INTENT = "Unknown";
+export const GENERAL_LISTENING_INTENT = "General Listening";
 export const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000;
 
 export const SESSION_ACTIONS_THRESHOLD = 5;

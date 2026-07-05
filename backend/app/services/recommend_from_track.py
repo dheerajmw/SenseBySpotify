@@ -6,6 +6,7 @@ from app.models.recommendation import Recommendation
 from app.models.track import Track
 from app.schemas.user_profile import UserProfilePayload
 from app.services.ai.openai_provider import OpenAIProvider
+from app.services.ai_ranking import rank_with_ai_or_fallback
 from app.services.candidates import fetch_candidates
 from app.services.context_builder import UserContextBuilder
 from app.services.music_catalog import MusicCatalogClient
@@ -15,7 +16,7 @@ from app.services.intent_genre_matching import (
     score_track_genre_fit,
     sort_tracks_by_genre_fit,
 )
-from app.services.recommendation_generator import RecommendationGenerator, fallback_rank
+from app.services.recommendation_generator import RecommendationGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class FollowUpRecommender:
         last_track_name: str,
         last_track_artist: str,
         intent_query: str,
-    ) -> tuple[Recommendation | None, int, bool]:
+    ) -> tuple[Recommendation | None, int, bool, str | None]:
         artist_name = last_track_artist.strip() or "Unknown"
         track_name = last_track_name.strip() or "Unknown"
         query = (intent_query or profile.current_intent or "").strip() or "music"
@@ -121,7 +122,7 @@ class FollowUpRecommender:
                     break
 
         if not candidates:
-            return None, 0, False
+            return None, 0, False, None
 
         target_genres = resolve_target_genres(query, list(profile.genres))
         candidates = sort_tracks_by_genre_fit(candidates, target_genres, query)
@@ -133,35 +134,25 @@ class FollowUpRecommender:
         )
 
         tracks_by_id = {track.id: track for track in candidates}
-        used_ai = True
 
-        try:
-            ranked = await self._ai.rank_tracks(
-                context=context,
-                query=follow_up_prompt,
-                candidates=candidates,
-                limit=1,
-            )
-            ranked = self._generator._validate_ranked(ranked, tracks_by_id)
-            if not ranked:
-                raise ValueError("AI returned no valid follow-up track")
-        except Exception as exc:
-            logger.warning("Follow-up AI ranking failed, using fallback: %s", exc)
-            used_ai = False
-            ranked = fallback_rank(
-                candidates,
-                query,
-                1,
-                profile_genres=list(profile.genres),
-            )
+        ranked, used_ai, fallback_reason = await rank_with_ai_or_fallback(
+            self._ai,
+            context=context,
+            query=follow_up_prompt,
+            candidates=candidates,
+            limit=1,
+            profile_genres=list(profile.genres),
+            tracks_by_id=tracks_by_id,
+            validate_ranked=self._generator._validate_ranked,
+        )
 
         if not ranked:
-            return None, len(candidates), used_ai
+            return None, len(candidates), used_ai, fallback_reason
 
         item = ranked[0]
         track = tracks_by_id.get(item.track_id)
         if track is None:
-            return None, len(candidates), used_ai
+            return None, len(candidates), used_ai, fallback_reason
 
         recommendation = Recommendation(
             track=track,
@@ -169,4 +160,4 @@ class FollowUpRecommender:
             reason=item.reason,
             confidence=item.confidence,
         )
-        return recommendation, len(candidates), used_ai
+        return recommendation, len(candidates), used_ai, fallback_reason

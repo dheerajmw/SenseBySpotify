@@ -17,6 +17,7 @@ class GenerateRecommendationsResponse(BaseModel):
     recommendations: list[Recommendation]
     candidate_count: int
     used_ai: bool
+    fallback_reason: str | None = None
 
 
 class LastTrackPayload(BaseModel):
@@ -36,3 +37,4 @@ class RecommendFromLastTrackResponse(BaseModel):
     recommendation: Recommendation | None
     candidate_count: int
     used_ai: bool
+    fallback_reason: str | None = None

@@ -1,5 +1,11 @@
-import { SESSION_EXPIRY_MS, UNKNOWN_SESSION_INTENT } from "../constants/brand";
+import {
+  GENERAL_LISTENING_INTENT,
+  SESSION_EXPIRY_MS,
+  UNKNOWN_SESSION_INTENT,
+} from "../constants/brand";
 import type { SessionState, Track } from "../types";
+import { validateProposedIntent } from "./intentValidation";
+import type { LocalUserProfile } from "../types";
 
 export type SessionStatus = "new" | "active" | "expired";
 
@@ -8,6 +14,11 @@ export function generateSessionId(): string {
     return crypto.randomUUID();
   }
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export function isGeneralListeningIntent(intent: string | null | undefined): boolean {
+  const trimmed = intent?.trim() ?? "";
+  return trimmed.toLowerCase() === GENERAL_LISTENING_INTENT.toLowerCase();
 }
 
 export function isUnknownIntent(intent: string | null | undefined): boolean {
@@ -19,11 +30,21 @@ export function isUnknownIntent(intent: string | null | undefined): boolean {
 }
 
 export function hasKnownIntent(intent: string | null | undefined): boolean {
-  return !isUnknownIntent(intent);
+  const trimmed = intent?.trim() ?? "";
+  return Boolean(trimmed) && !isUnknownIntent(trimmed);
 }
 
 export function getActiveIntent(session: SessionState): string {
-  return hasKnownIntent(session.currentIntent) ? session.currentIntent.trim() : "";
+  const trimmed = session.currentIntent?.trim() ?? "";
+  if (!trimmed || isUnknownIntent(trimmed)) {
+    return "";
+  }
+  return trimmed;
+}
+
+export function getRecommendationIntent(session: SessionState): string {
+  const active = getActiveIntent(session);
+  return active || GENERAL_LISTENING_INTENT;
 }
 
 export function isSessionExpired(
@@ -57,7 +78,7 @@ export function getSessionStatus(
   const sessionAgeMs = Number.isNaN(createdAt) ? Number.POSITIVE_INFINITY : now - createdAt;
   const idleMs = Number.isNaN(lastActive) ? Number.POSITIVE_INFINITY : now - lastActive;
 
-  if (isUnknownIntent(session.currentIntent) && sessionAgeMs < 60_000 && idleMs < 60_000) {
+  if (!session.currentIntent && sessionAgeMs < 60_000 && idleMs < 60_000) {
     return "new";
   }
 
@@ -109,4 +130,31 @@ export function touchSessionTimestamps(session: SessionState): SessionState {
 export interface SessionQueueSnapshot {
   currentQueue: Track[];
   currentQueueIndex: number;
+}
+
+export function resolveInitialSessionIntent(profile: LocalUserProfile): {
+  currentIntent: string;
+  intentConfidence: number;
+  reason: string;
+} {
+  if (profile.onboardingCompleted && profile.currentIntent.trim()) {
+    const validation = validateProposedIntent(
+      profile.currentIntent,
+      GENERAL_LISTENING_INTENT,
+      profile.favouriteArtists.map((artist) => artist.name),
+    );
+    if (validation.accepted) {
+      return {
+        currentIntent: validation.intent,
+        intentConfidence: 100,
+        reason: `Session started from your onboarding intent: "${validation.intent}".`,
+      };
+    }
+  }
+
+  return {
+    currentIntent: GENERAL_LISTENING_INTENT,
+    intentConfidence: 100,
+    reason: "General listening — Sense will learn your mood from what you play.",
+  };
 }

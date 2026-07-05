@@ -11,26 +11,21 @@ import {
 import { api } from "../api/client";
 import {
   DEMO_MODE_STORAGE_KEY,
+  GENERAL_LISTENING_INTENT,
   SESSION_STORAGE_KEY,
-  UNKNOWN_SESSION_INTENT,
+  SESSION_VISIT_KEY,
 } from "../constants/brand";
 import { updateSessionIntent } from "../services/sessionIntentService";
-import { intentsAlign, hasIntentChanged } from "../utils/intent";
+import { intentsAlign } from "../utils/intent";
 import {
   INTENT_CONFIDENCE_THRESHOLD,
   LISTENING_WINDOW_MS,
-  applyActionConfidence,
   applyActionToEvidence,
-  applyListeningCandidateShift,
   createEvidenceSnapshot,
-  mergeEvaluationConfidence,
-  OFF_GENRE_SUSTAINED_LISTEN_DECAY,
-  shouldApplyIntentChange,
   shouldEvaluateIntent,
   type IntentEvidenceSnapshot,
 } from "../utils/intentEvidence";
 import {
-  mapSearchToCandidateIntent,
   validateProposedIntent,
   isDiscoveryLabel,
 } from "../utils/intentValidation";
@@ -41,19 +36,24 @@ import {
   normalizeNoveltyTolerance,
 } from "../utils/discoveryLevel";
 import { playbackBridge } from "../utils/playbackBridge";
-import { learningMessageForAction } from "../utils/sessionDisplay";
-import { trackMatchesPredictedIntent } from "../utils/trackIntentFit";
 import {
-  applySearchCandidateConfidence,
-  createOrMergeSearchCandidate,
-  decaySearchCandidateOnPrimaryActivity,
-  inferSearchIntent,
-  isSearchReinforcingSession,
-  SEARCH_PLAY_CONFIDENCE_BOOST,
-} from "../utils/searchCandidateIntent";
+  formatResolvedIntentLabel,
+  resolveUserDeclaredIntent,
+} from "../utils/userIntentInput";
+import { buildRecommendationRequest } from "../utils/recommendationContext";
+import { learningMessageForAction } from "../utils/sessionDisplay";
+import {
+  applyAiCandidateSuggestion,
+  applyListeningEvidence,
+  applySearchCandidateSeed,
+  buildPromotedSessionState,
+  computeIntentDecision,
+  shouldPromoteCandidate,
+} from "../utils/sessionIntentEngine";
 import {
   generateSessionId,
   getActiveIntent,
+  getRecommendationIntent,
   getSessionStatus,
   hasKnownIntent,
   isSessionExpired,
@@ -76,8 +76,16 @@ import type {
 } from "../types";
 
 const MAX_RECENT_ACTIONS = 15;
-const INTENT_MODAL_VISIBLE_MS = 1400;
+/** Minimum time the before/after mood shift is shown before refresh begins. */
+const INTENT_MODAL_VISIBLE_MS = 2800;
+/** Brief pause after refresh so the transition does not feel like a flash. */
+const INTENT_MODAL_DISMISS_MS = 600;
 const DISCOVERY_MODAL_VISIBLE_MS = 1400;
+
+interface IntentPromotionOptions {
+  /** Behaviour-driven switch — use toast + immediate refresh instead of blocking modal. */
+  local?: boolean;
+}
 
 export interface IntentChangeModalState {
   before: string;
@@ -103,10 +111,7 @@ export interface LogActionOptions {
   track?: Track;
   /** Autoplay PLAY — skip confidence until LISTENED_20S */
   deferConfidence?: boolean;
-  /** Routes confidence to the parallel search candidate instead of the primary candidate. */
   queueSource?: QueueSource;
-  /** Search playback that reinforces the active session mood. */
-  reinforceSession?: boolean;
 }
 
 interface SessionContextValue {
@@ -179,46 +184,6 @@ function mergePreferredGenres(current: string[], incoming: string[]): string[] {
   return merged.slice(0, 12);
 }
 
-function computeIntentDecision(
-  currentIntent: string,
-  candidateIntent: string,
-  intentConfidence: number,
-  validationStatus?: "accepted" | "rejected" | "pending",
-): string {
-  if (validationStatus === "rejected") {
-    return "Keeping your current mood — invalid suggestion ignored";
-  }
-  if (!candidateIntent || intentsAlign(currentIntent, candidateIntent)) {
-    return "Your session mood looks steady";
-  }
-  if (intentConfidence >= INTENT_CONFIDENCE_THRESHOLD) {
-    return `Switching to “${candidateIntent}” (${intentConfidence}/${INTENT_CONFIDENCE_THRESHOLD} points)`;
-  }
-  return `Watching “${candidateIntent}” — ${intentConfidence}/${INTENT_CONFIDENCE_THRESHOLD} points to switch`;
-}
-
-function buildPromotedSessionState(
-  snapshot: SessionState,
-  afterIntent: string,
-  confidence: number,
-  reason: string,
-): SessionState {
-  return {
-    ...snapshot,
-    currentIntent: afterIntent,
-    candidateIntent: afterIntent,
-    intentConfidence: Math.max(confidence, INTENT_CONFIDENCE_THRESHOLD),
-    searchCandidate: null,
-    recommendationVersion: snapshot.recommendationVersion + 1,
-    aiReason: reason,
-    intentDecision: `Listening for "${afterIntent}"`,
-    listeningShiftIntent: null,
-    listeningShiftPlayCount: 0,
-    interactionsCollected: 0,
-    explicitPreferenceSignals: 0,
-  };
-}
-
 function createNewListeningSession(discoveryLevel = 50): SessionState {
   const now = new Date().toISOString();
   const discoveryProfile = getDiscoveryProfile(discoveryLevel);
@@ -226,10 +191,12 @@ function createNewListeningSession(discoveryLevel = 50): SessionState {
     sessionId: generateSessionId(),
     createdAt: now,
     lastActive: now,
-    currentIntent: UNKNOWN_SESSION_INTENT,
-    candidateIntent: UNKNOWN_SESSION_INTENT,
+    currentIntent: null,
+    candidateIntent: null,
     intentConfidence: 0,
-    searchCandidate: null,
+    candidateConfidence: 0,
+    evidence: [],
+    confidenceTimeline: [],
     lastSearchQuery: null,
     preferredArtists: [],
     preferredGenres: [],
@@ -244,11 +211,24 @@ function createNewListeningSession(discoveryLevel = 50): SessionState {
     lastUpdated: now,
     recommendationVersion: 1,
     aiReason: "New listening session started.",
-    intentDecision: "Waiting for listening intent",
+    intentDecision: "Waiting for listening behaviour",
+    lastPromotionReason: null,
+    rejectedAiIntents: [],
     lastIntentValidation: null,
     personalizedSecondSongUsed: false,
-    listeningShiftIntent: null,
-    listeningShiftPlayCount: 0,
+    intentDeclaredThisSession: false,
+  };
+}
+
+function bootstrapNewSession(discoveryLevel: number): SessionState {
+  const base = createNewListeningSession(discoveryLevel);
+  return {
+    ...base,
+    currentIntent: null,
+    intentConfidence: 0,
+    aiReason: "Tell Sense what you want to listen for this session.",
+    intentDecision: "Waiting for your session intent",
+    intentDeclaredThisSession: false,
   };
 }
 
@@ -261,14 +241,34 @@ function loadDemoMode(): boolean {
 }
 
 function normalizeSessionState(
-  session: Partial<SessionState>,
+  session: Partial<SessionState> & {
+    searchCandidates?: unknown[];
+    searchCandidate?: unknown;
+    listeningShiftIntent?: string | null;
+    listeningShiftPlayCount?: number;
+  },
   discoveryLevel: number,
 ): SessionState {
   const base = createNewListeningSession(discoveryLevel);
-  const currentIntent = session.currentIntent?.trim() || UNKNOWN_SESSION_INTENT;
-  const candidateIntent = session.candidateIntent?.trim() || currentIntent;
   const createdAt = session.createdAt ?? base.createdAt;
   const lastActive = session.lastActive ?? session.lastUpdated ?? createdAt;
+  const currentIntent =
+    session.currentIntent?.trim() ||
+    (isUnknownIntent(session.currentIntent) ? GENERAL_LISTENING_INTENT : null);
+
+  let candidateIntent = session.candidateIntent?.trim() || null;
+  let candidateConfidence =
+    typeof session.candidateConfidence === "number" ? session.candidateConfidence : 0;
+
+  if (
+    candidateConfidence === 0 &&
+    typeof session.intentConfidence === "number" &&
+    candidateIntent &&
+    currentIntent &&
+    !intentsAlign(candidateIntent, currentIntent)
+  ) {
+    candidateConfidence = session.intentConfidence;
+  }
 
   return {
     ...base,
@@ -276,39 +276,47 @@ function normalizeSessionState(
     sessionId: session.sessionId ?? base.sessionId,
     createdAt,
     lastActive,
-    currentIntent,
+    currentIntent: currentIntent ?? base.currentIntent,
     candidateIntent,
-    currentQueue: session.currentQueue ?? [],
-    currentQueueIndex: session.currentQueueIndex ?? 0,
+    candidateConfidence,
     intentConfidence:
       typeof session.intentConfidence === "number"
         ? session.intentConfidence
-        : hasKnownIntent(currentIntent)
+        : currentIntent
           ? 100
           : 0,
+    evidence: session.evidence ?? [],
+    confidenceTimeline: session.confidenceTimeline ?? [],
+    lastPromotionReason: session.lastPromotionReason ?? null,
+    rejectedAiIntents: session.rejectedAiIntents ?? [],
+    currentQueue: session.currentQueue ?? [],
+    currentQueueIndex: session.currentQueueIndex ?? 0,
     interactionsCollected: session.interactionsCollected ?? 0,
     explicitPreferenceSignals: session.explicitPreferenceSignals ?? 0,
     preferredArtists: session.preferredArtists ?? [],
     preferredGenres: session.preferredGenres ?? [],
-    intentDecision: session.intentDecision ?? "Waiting for more evidence",
+    intentDecision: session.intentDecision ?? "Waiting for listening behaviour",
     lastIntentValidation: session.lastIntentValidation ?? null,
     personalizedSecondSongUsed: session.personalizedSecondSongUsed ?? false,
-    listeningShiftIntent: session.listeningShiftIntent ?? null,
-    listeningShiftPlayCount: session.listeningShiftPlayCount ?? 0,
-    searchCandidate: session.searchCandidate ?? null,
     lastSearchQuery: session.lastSearchQuery ?? null,
+    intentDeclaredThisSession:
+      session.intentDeclaredThisSession ??
+      Boolean(session.currentIntent?.trim() && (session.intentConfidence ?? 0) >= 100),
   };
 }
 
 function resolveStoredSession(discoveryLevel: number): ResolvedSession {
   try {
-    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (!raw) {
+    const visitActive = sessionStorage.getItem(SESSION_VISIT_KEY);
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+
+    if (!visitActive || !raw) {
+      sessionStorage.setItem(SESSION_VISIT_KEY, "1");
       return {
-        session: createNewListeningSession(discoveryLevel),
+        session: bootstrapNewSession(discoveryLevel),
         intentHistory: [],
         isNewSession: true,
-        wasExpired: false,
+        wasExpired: Boolean(raw),
       };
     }
 
@@ -317,9 +325,9 @@ function resolveStoredSession(discoveryLevel: number): ResolvedSession {
     const lastActive = resolveSessionLastActive(storedSession ?? {});
 
     if (!storedSession || isSessionExpired(lastActive)) {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
       return {
-        session: createNewListeningSession(discoveryLevel),
+        session: bootstrapNewSession(discoveryLevel),
         intentHistory: [],
         isNewSession: true,
         wasExpired: Boolean(storedSession),
@@ -348,9 +356,9 @@ function resolveStoredSession(discoveryLevel: number): ResolvedSession {
       wasExpired: false,
     };
   } catch {
-    localStorage.removeItem(SESSION_STORAGE_KEY);
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
     return {
-      session: createNewListeningSession(discoveryLevel),
+      session: bootstrapNewSession(discoveryLevel),
       intentHistory: [],
       isNewSession: true,
       wasExpired: false,
@@ -360,7 +368,7 @@ function resolveStoredSession(discoveryLevel: number): ResolvedSession {
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const { profile, updateProfile } = useProfile();
-  const { recommendations, setFeed, query: feedQuery, clearFeed } = useRecommendations();
+  const { recommendations, setFeed, query: feedQuery, clearFeed, usedAi, fallbackReason } = useRecommendations();
   const initialDiscovery = normalizeNoveltyTolerance(profile.noveltyTolerance);
   const initial = resolveStoredSession(initialDiscovery);
   const [session, setSession] = useState<SessionState>(initial.session);
@@ -382,6 +390,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const listeningTimer = useRef<number | null>(null);
   const learningTimer = useRef<number | null>(null);
   const isCheckingRef = useRef(false);
+  const aiRecoveryAttemptedRef = useRef(false);
   const sessionRef = useRef(session);
   const recommendationsRef = useRef(recommendations);
   const profileRef = useRef(profile);
@@ -397,10 +406,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   demoModeRef.current = demoMode;
 
   const sessionStatus = useMemo(() => getSessionStatus(session), [session]);
-  const needsIntentPrompt = isUnknownIntent(session.currentIntent);
+  const needsIntentPrompt =
+    profile.onboardingCompleted && !session.intentDeclaredThisSession;
 
   const saveState = useCallback((nextSession: SessionState, history: IntentHistoryEntry[]) => {
-    localStorage.setItem(
+    sessionStorage.setItem(
       SESSION_STORAGE_KEY,
       JSON.stringify({ session: nextSession, intentHistory: history }),
     );
@@ -454,28 +464,52 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
+      const profileArtists = profileRef.current.favouriteArtists.map((artist) => artist.name);
+      const resolved = resolveUserDeclaredIntent(trimmed, {
+        knownArtists: profileArtists,
+        profileGenres: profileRef.current.genres,
+      });
+
+      if (!resolved.accepted) {
+        return false;
+      }
+
+      const canonicalIntent = resolved.intent;
+
       if (
+        sessionRef.current.intentDeclaredThisSession &&
         hasKnownIntent(sessionRef.current.currentIntent) &&
-        intentsAlign(sessionRef.current.currentIntent, trimmed)
+        sessionRef.current.currentIntent &&
+        intentsAlign(sessionRef.current.currentIntent, canonicalIntent)
       ) {
         return false;
       }
 
+      const displayLabel = resolved.displayLabel || formatResolvedIntentLabel(
+        canonicalIntent,
+        resolved.preferredGenres,
+      );
       const bumpVersion = options?.bumpVersion ?? false;
       const next: SessionState = {
         ...sessionRef.current,
-        currentIntent: trimmed,
-        candidateIntent: trimmed,
+        currentIntent: canonicalIntent,
+        candidateIntent: null,
+        candidateConfidence: 0,
         intentConfidence: 100,
+        intentDeclaredThisSession: true,
         interactionsCollected: 0,
         explicitPreferenceSignals: 0,
-        listeningShiftIntent: null,
-        listeningShiftPlayCount: 0,
-        searchCandidate: null,
-        lastSearchQuery: null,
+        preferredArtists: mergePreferredArtists(
+          sessionRef.current.preferredArtists,
+          resolved.preferredArtists,
+        ),
+        preferredGenres: mergePreferredGenres(
+          sessionRef.current.preferredGenres,
+          resolved.preferredGenres,
+        ),
         confidence: Math.max(sessionRef.current.confidence, 0.8),
-        aiReason: reason,
-        intentDecision: `Listening for "${trimmed}"`,
+        aiReason: reason || `Session tuned for ${displayLabel}.`,
+        intentDecision: `Listening for "${canonicalIntent}"`,
         recommendationVersion: bumpVersion
           ? sessionRef.current.recommendationVersion + 1
           : sessionRef.current.recommendationVersion,
@@ -486,9 +520,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (options?.addHistory !== false) {
         const entry: IntentHistoryEntry = {
           timestamp: Date.now(),
-          intent: trimmed,
+          intent: canonicalIntent,
           confidence: next.confidence,
-          reason,
+          reason: next.aiReason,
         };
         nextHistory = [...intentHistoryRef.current, entry].slice(-20);
         intentHistoryRef.current = nextHistory;
@@ -517,31 +551,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       );
       const validation = validateProposedIntent(
         trimmed,
-        sessionRef.current.currentIntent,
+        sessionRef.current.currentIntent ?? GENERAL_LISTENING_INTENT,
         profileArtists,
       );
       if (!validation.accepted) {
         return false;
       }
 
-      if (intentsAlign(sessionRef.current.currentIntent, validation.intent)) {
+      if (intentsAlign(sessionRef.current.currentIntent ?? "", validation.intent)) {
         return false;
       }
 
       const bumpVersion = options?.bumpVersion ?? false;
       const next: SessionState = {
         ...sessionRef.current,
-        currentIntent: validation.intent,
         candidateIntent: validation.intent,
-        intentConfidence: 100,
-        interactionsCollected: 0,
-        explicitPreferenceSignals: 0,
-        listeningShiftIntent: null,
-        listeningShiftPlayCount: 0,
-        searchCandidate: null,
-        lastSearchQuery: null,
-        confidence: Math.max(sessionRef.current.confidence, 0.8),
-        aiReason: reason,
+        candidateConfidence: Math.max(
+          sessionRef.current.candidateConfidence,
+          INTENT_CONFIDENCE_THRESHOLD,
+        ),
         preferredArtists: mergePreferredArtists(
           sessionRef.current.preferredArtists,
           validation.preferredArtists,
@@ -550,7 +578,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           sessionRef.current.preferredGenres,
           validation.preferredGenres,
         ),
-        intentDecision: `Applying intent change to "${validation.intent}"`,
+        aiReason: reason,
+        intentDecision: `AI suggested "${validation.intent}" — awaiting behavioural confirmation`,
         recommendationVersion: bumpVersion
           ? sessionRef.current.recommendationVersion + 1
           : sessionRef.current.recommendationVersion,
@@ -581,19 +610,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const refreshRecommendations = useCallback(
     async (intent?: string) => {
       const activeIntent =
-        intent?.trim() || getActiveIntent(sessionRef.current);
+        intent?.trim() || getRecommendationIntent(sessionRef.current);
       if (!activeIntent) {
         return null;
       }
 
       setIsRegeneratingFeed(true);
       try {
-        const activeProfile = {
-          ...profileRef.current,
-          currentIntent: activeIntent,
-          noveltyTolerance: sessionRef.current.discoveryLevel,
-        };
-        const response = await api.generateRecommendations(activeProfile, activeIntent);
+        const { query, profile: requestProfile } = buildRecommendationRequest(
+          profileRef.current,
+          sessionRef.current,
+          activeIntent,
+        );
+        const response = await api.generateRecommendations(requestProfile, query);
         setFeed(response);
         lastSyncedFeedQuery.current = response.query;
         return response;
@@ -604,6 +633,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [setFeed],
   );
 
+  useEffect(() => {
+    if (aiRecoveryAttemptedRef.current || usedAi || !fallbackReason) {
+      return;
+    }
+    const intent = getActiveIntent(sessionRef.current) || feedQuery;
+    if (!intent || !profileRef.current.onboardingCompleted) {
+      return;
+    }
+    aiRecoveryAttemptedRef.current = true;
+    void refreshRecommendations(intent);
+  }, [usedAi, fallbackReason, feedQuery, refreshRecommendations]);
+
   const establishSessionIntent = useCallback(
     async (intent: string) => {
       const trimmed = intent.trim();
@@ -611,16 +652,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return null;
       }
 
+      const profileArtists = profileRef.current.favouriteArtists.map((artist) => artist.name);
+      const resolved = resolveUserDeclaredIntent(trimmed, {
+        knownArtists: profileArtists,
+        profileGenres: profileRef.current.genres,
+      });
+
+      if (!resolved.accepted) {
+        throw new Error(
+          resolved.rejectionReason ??
+            "Could not start listening session with that intent.",
+        );
+      }
+
+      const displayLabel =
+        resolved.displayLabel ||
+        formatResolvedIntentLabel(resolved.intent, resolved.preferredGenres);
+
       const established = applyUserDeclaredIntent(
         trimmed,
-        `Started listening session for "${trimmed}".`,
+        `Session tuned for ${displayLabel}.`,
         { bumpVersion: true },
       );
       if (!established) {
         throw new Error("Could not start listening session with that intent.");
       }
 
-      return refreshRecommendations(trimmed);
+      return refreshRecommendations(resolved.intent);
     },
     [applyUserDeclaredIntent, refreshRecommendations],
   );
@@ -755,7 +813,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const showIntentPromotionFlow = useCallback(
-    async (beforeIntent: string, afterIntent: string, reason: string) => {
+    async (
+      beforeIntent: string,
+      afterIntent: string,
+      reason: string,
+      options?: IntentPromotionOptions,
+    ) => {
+      if (options?.local) {
+        showLearningNotice(`Switched to ${afterIntent}`);
+        if (playbackBridge.isPlaying) {
+          playbackBridge.pendingIntentRefresh = {
+            intent: afterIntent,
+            preferredArtists: sessionRef.current.preferredArtists,
+          };
+        } else {
+          await refreshRecommendations(afterIntent);
+        }
+        return;
+      }
+
       setIntentChangeModal({
         before: beforeIntent,
         after: afterIntent,
@@ -772,24 +848,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           intent: afterIntent,
           preferredArtists: sessionRef.current.preferredArtists,
         };
-        setIntentChangeModal(null);
       } else {
         setIntentChangeModal((current) =>
           current ? { ...current, phase: "refreshing" } : null,
         );
         await refreshRecommendations(afterIntent);
-        window.setTimeout(() => setIntentChangeModal(null), 400);
       }
+
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, INTENT_MODAL_DISMISS_MS);
+      });
+      setIntentChangeModal(null);
     },
-    [refreshRecommendations],
+    [refreshRecommendations, showLearningNotice],
   );
 
   const runIntentCheck = useCallback(async () => {
-    if (isCheckingRef.current || needsIntentPrompt) {
+    if (isCheckingRef.current) {
       return;
     }
 
-    const readiness = shouldEvaluateIntent(evidenceRef.current);
+    const readiness = shouldEvaluateIntent(evidenceRef.current, {
+      candidateConfidence: sessionRef.current.candidateConfidence,
+      currentIntent: sessionRef.current.currentIntent,
+      candidateIntent: sessionRef.current.candidateIntent,
+    });
     if (!readiness.ready) {
       return;
     }
@@ -804,30 +887,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const sessionSnapshot = sessionRef.current;
     const profileSnapshot = {
       ...profileRef.current,
-      currentIntent: getActiveIntent(sessionSnapshot),
+      currentIntent: getRecommendationIntent(sessionSnapshot),
     };
 
-    const localCandidate = sessionSnapshot.candidateIntent?.trim();
-    if (
-      localCandidate &&
-      shouldApplyIntentChange(
-        sessionSnapshot.intentConfidence,
-        sessionSnapshot.currentIntent,
-        localCandidate,
-      )
-    ) {
-      const beforeIntent = sessionSnapshot.currentIntent;
-      const reason = `Listening behaviour reached ${INTENT_CONFIDENCE_THRESHOLD} points for "${localCandidate}".`;
-      const next = buildPromotedSessionState(
-        sessionSnapshot,
-        localCandidate,
-        sessionSnapshot.intentConfidence,
-        reason,
-      );
+    if (shouldPromoteCandidate(sessionSnapshot) && sessionSnapshot.candidateIntent) {
+      const beforeIntent = sessionSnapshot.currentIntent ?? GENERAL_LISTENING_INTENT;
+      const promotedIntent = sessionSnapshot.candidateIntent;
+      const reason = `Listening behaviour reached ${INTENT_CONFIDENCE_THRESHOLD} points for "${promotedIntent}".`;
+      const next = buildPromotedSessionState(sessionSnapshot, promotedIntent, reason);
       const entry: IntentHistoryEntry = {
         timestamp: Date.now(),
-        intent: localCandidate,
-        confidence: next.confidence,
+        intent: promotedIntent,
+        confidence: 1,
         reason,
       };
       const nextHistory = [...intentHistoryRef.current, entry].slice(-20);
@@ -835,9 +906,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setIntentHistory(nextHistory);
       persistSession(next, nextHistory);
       resetEvidence();
-      void showIntentPromotionFlow(beforeIntent, localCandidate, reason);
-      isCheckingRef.current = false;
-      setIsCheckingIntent(false);
+      void showIntentPromotionFlow(beforeIntent, promotedIntent, reason);
       return;
     }
 
@@ -853,14 +922,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       );
       const validation = validateProposedIntent(
         result.new_intent,
-        sessionSnapshot.currentIntent,
+        sessionSnapshot.currentIntent ?? GENERAL_LISTENING_INTENT,
         profileArtists,
       );
       const apiRejected =
         result.validation_status === "rejected" || !validation.accepted;
-      const apiCandidate = apiRejected
-        ? sessionSnapshot.currentIntent
-        : validation.intent;
       const preferredArtists = mergePreferredArtists(
         mergePreferredArtists(
           sessionSnapshot.preferredArtists,
@@ -875,22 +941,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         ),
         validation.preferredGenres,
       );
-      const mergedConfidence = mergeEvaluationConfidence(
-        sessionSnapshot.intentConfidence,
-        result.confidence,
-        apiCandidate,
-        sessionSnapshot.currentIntent,
-      );
-      const applyChange =
-        !apiRejected &&
-        shouldApplyIntentChange(
-          mergedConfidence,
-          sessionSnapshot.currentIntent,
-          apiCandidate,
-        ) &&
-        hasIntentChanged(sessionSnapshot.currentIntent, apiCandidate);
 
-      const nextIntent = applyChange ? apiCandidate : sessionSnapshot.currentIntent;
+      const aiSuggestion = apiRejected
+        ? {
+            candidateIntent: sessionSnapshot.candidateIntent,
+            candidateConfidence: sessionSnapshot.candidateConfidence,
+            rejectedIntent: result.new_intent,
+            rejectionReason:
+              result.validation_message ?? validation.rejectionReason,
+            aiReason: `${result.reason} ${result.validation_message ?? validation.rejectionReason ?? ""}`.trim(),
+            timelineEntry: null,
+          }
+        : applyAiCandidateSuggestion(
+            sessionSnapshot,
+            validation.intent,
+            result.confidence,
+            result.reason,
+            profileArtists,
+          );
+
       const validationDebug: IntentValidationDebug = {
         rawAiOutput: { ...result },
         parsedOutput: {
@@ -905,89 +974,56 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         validationMessage:
           result.validation_message ??
           validation.rejectionReason ??
+          aiSuggestion.rejectionReason ??
           null,
         rawNewIntent: result.raw_new_intent ?? result.new_intent,
       };
       const intentDecision = computeIntentDecision(
         sessionSnapshot.currentIntent,
-        apiRejected ? sessionSnapshot.candidateIntent : apiCandidate,
-        mergedConfidence,
+        aiSuggestion.candidateIntent,
+        aiSuggestion.candidateConfidence,
         validationDebug.validationStatus,
       );
 
-      setSession((current) => {
-        const next: SessionState = {
-          ...current,
-          candidateIntent: apiRejected ? current.candidateIntent : apiCandidate,
-          intentConfidence: mergedConfidence,
-          confidence: result.confidence,
-          aiReason: apiRejected
-            ? `${result.reason} ${validationDebug.validationMessage ?? ""}`.trim()
-            : applyChange
-              ? result.reason
-              : `${result.reason} (Confidence ${mergedConfidence}/${INTENT_CONFIDENCE_THRESHOLD} points — below switch threshold; keeping "${current.currentIntent}".)`,
-          preferredArtists,
-          preferredGenres,
-          interactionsCollected: 0,
-          explicitPreferenceSignals: 0,
-          listeningShiftIntent: null,
-          listeningShiftPlayCount: 0,
-          intentDecision,
-          lastIntentValidation: validationDebug,
-        };
+      const next: SessionState = {
+        ...sessionSnapshot,
+        candidateIntent: aiSuggestion.candidateIntent,
+        candidateConfidence: aiSuggestion.candidateConfidence,
+        confidence: result.confidence,
+        aiReason: aiSuggestion.aiReason,
+        preferredArtists,
+        preferredGenres,
+        interactionsCollected: 0,
+        explicitPreferenceSignals: 0,
+        intentDecision,
+        lastIntentValidation: validationDebug,
+        rejectedAiIntents: aiSuggestion.rejectedIntent
+          ? [...sessionSnapshot.rejectedAiIntents, aiSuggestion.rejectedIntent].slice(-10)
+          : sessionSnapshot.rejectedAiIntents,
+        confidenceTimeline: aiSuggestion.timelineEntry
+          ? [...sessionSnapshot.confidenceTimeline, aiSuggestion.timelineEntry].slice(-30)
+          : sessionSnapshot.confidenceTimeline,
+      };
 
-        if (applyChange) {
-          next.currentIntent = nextIntent;
-          next.candidateIntent = nextIntent;
-          next.intentConfidence = Math.max(mergedConfidence, INTENT_CONFIDENCE_THRESHOLD);
-          next.searchCandidate = null;
-          next.recommendationVersion = current.recommendationVersion + 1;
-        }
-
-        let nextHistory = intentHistoryRef.current;
-        if (applyChange) {
-          const entry: IntentHistoryEntry = {
-            timestamp: Date.now(),
-            intent: nextIntent,
-            confidence: result.confidence,
-            reason: result.reason,
-          };
-          nextHistory = [...intentHistoryRef.current, entry].slice(-20);
-          intentHistoryRef.current = nextHistory;
-          setIntentHistory(nextHistory);
-        }
-
-        persistSession(next, nextHistory);
-        return sessionRef.current;
-      });
-
+      persistSession(next);
       resetEvidence();
 
-      if (applyChange && hasIntentChanged(sessionSnapshot.currentIntent, nextIntent)) {
-        setIntentChangeModal({
-          before: sessionSnapshot.currentIntent,
-          after: nextIntent,
-          reason: result.reason,
-          phase: "visible",
-        });
-
-        await new Promise((resolve) => {
-          window.setTimeout(resolve, INTENT_MODAL_VISIBLE_MS);
-        });
-
-        if (playbackBridge.isPlaying) {
-          playbackBridge.pendingIntentRefresh = {
-            intent: nextIntent,
-            preferredArtists,
-          };
-          setIntentChangeModal(null);
-        } else {
-          setIntentChangeModal((current) =>
-            current ? { ...current, phase: "refreshing" } : null,
-          );
-          await refreshRecommendations(nextIntent);
-          window.setTimeout(() => setIntentChangeModal(null), 400);
-        }
+      if (shouldPromoteCandidate(next) && next.candidateIntent) {
+        const beforeIntent = sessionSnapshot.currentIntent ?? GENERAL_LISTENING_INTENT;
+        const promotedIntent = next.candidateIntent;
+        const reason = `AI and listening behaviour agree on "${promotedIntent}".`;
+        const promoted = buildPromotedSessionState(next, promotedIntent, reason);
+        const entry: IntentHistoryEntry = {
+          timestamp: Date.now(),
+          intent: promotedIntent,
+          confidence: 1,
+          reason,
+        };
+        const nextHistory = [...intentHistoryRef.current, entry].slice(-20);
+        intentHistoryRef.current = nextHistory;
+        setIntentHistory(nextHistory);
+        persistSession(promoted, nextHistory);
+        await showIntentPromotionFlow(beforeIntent, promotedIntent, reason);
       }
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -998,14 +1034,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isCheckingRef.current = false;
       setIsCheckingIntent(false);
     }
-  }, [needsIntentPrompt, persistSession, refreshRecommendations, resetEvidence, showIntentPromotionFlow]);
+  }, [persistSession, resetEvidence, showIntentPromotionFlow]);
 
   const scheduleIntentEvaluation = useCallback(() => {
-    if (needsIntentPrompt) {
-      return;
-    }
-
-    const readiness = shouldEvaluateIntent(evidenceRef.current);
+    const readiness = shouldEvaluateIntent(evidenceRef.current, {
+      candidateConfidence: sessionRef.current.candidateConfidence,
+      currentIntent: sessionRef.current.currentIntent,
+      candidateIntent: sessionRef.current.candidateIntent,
+    });
     if (readiness.ready) {
       void runIntentCheck();
       return;
@@ -1023,316 +1059,119 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         void runIntentCheck();
       }, remaining);
     }
-  }, [needsIntentPrompt, runIntentCheck]);
+  }, [runIntentCheck]);
 
   const logAction = useCallback(
     (type: SessionActionType, value: string, options?: LogActionOptions) => {
       const action: SessionAction = { type, value, timestamp: Date.now() };
       let snapshot = sessionRef.current;
       const profileGenres = profileRef.current.genres;
-      const isSearchLane = options?.queueSource === "search";
+      const knownArtists = profileRef.current.favouriteArtists.map((artist) => artist.name);
       const deferPlayConfidence =
         options?.deferConfidence === true && type === "PLAY";
 
-      evidenceRef.current = {
-        ...evidenceRef.current,
-        listeningShiftIntent: snapshot.listeningShiftIntent,
-        listeningShiftPlayCount: snapshot.listeningShiftPlayCount,
-      };
-
-      let candidateIntent = snapshot.candidateIntent || snapshot.currentIntent;
-      let intentConfidence = snapshot.intentConfidence;
-      let searchCandidate = snapshot.searchCandidate;
-      let lastSearchQuery = snapshot.lastSearchQuery;
-      let listeningShiftMessage: string | null = null;
-
       if (type === "SEARCH") {
         const query = value.trim();
-        if (query) {
-          lastSearchQuery = query;
-          const mapped = inferSearchIntent(query, undefined, profileGenres);
-          if (mapped && !intentsAlign(snapshot.currentIntent, mapped)) {
-            searchCandidate = createOrMergeSearchCandidate(
-              searchCandidate,
-              mapped,
-              query,
-            );
-          }
-        }
-      } else if (type === "SEARCH_ARTIST") {
-        const query = value.trim();
-        if (query) {
-          const nextArtists = mergePreferredArtists(snapshot.preferredArtists, [query]);
-          snapshot = { ...snapshot, preferredArtists: nextArtists };
-        }
-      }
-
-      if (type === "SEARCH" || type === "SEARCH_ARTIST") {
-        const next: SessionState = {
-          ...snapshot,
-          recentActions: [...snapshot.recentActions, action].slice(-MAX_RECENT_ACTIONS),
-          searchCandidate,
-          lastSearchQuery,
-          candidateIntent:
-            searchCandidate &&
-            !intentsAlign(snapshot.currentIntent, searchCandidate.intent)
-              ? searchCandidate.intent
-              : snapshot.candidateIntent,
-        };
-        persistSession(next);
-        return;
-      }
-
-      const searchPlaybackTypes = [
-        "PLAY",
-        "LISTENED_20S",
-        "LIKE",
-        "SKIP",
-        "REPLAY",
-        "DISLIKE",
-      ] as const;
-      const searchQuery = lastSearchQuery ?? searchCandidate?.query ?? value.trim();
-      const reinforcesSession =
-        options?.reinforceSession === true ||
-        (isSearchLane &&
-          !deferPlayConfidence &&
-          searchPlaybackTypes.includes(type as (typeof searchPlaybackTypes)[number]) &&
-          isSearchReinforcingSession(
-            snapshot.currentIntent,
-            searchQuery,
-            options?.track,
-            profileGenres,
-          ));
-
-      if (reinforcesSession && searchCandidate) {
-        searchCandidate = null;
-      }
-
-      const searchLaneAction =
-        isSearchLane &&
-        searchPlaybackTypes.includes(type as (typeof searchPlaybackTypes)[number]);
-
-      if (searchLaneAction && !deferPlayConfidence && !reinforcesSession) {
-        const query = searchQuery;
-
-        if (type === "PLAY" && options?.track) {
-          const inferred = inferSearchIntent(query, options.track, profileGenres);
-          if (inferred && !intentsAlign(snapshot.currentIntent, inferred)) {
-            if (
-              !searchCandidate ||
-              !intentsAlign(searchCandidate.intent, inferred)
-            ) {
-              searchCandidate = createOrMergeSearchCandidate(
-                searchCandidate,
-                inferred,
-                query,
-                SEARCH_PLAY_CONFIDENCE_BOOST,
-              );
-            } else {
-              searchCandidate = applySearchCandidateConfidence(
-                searchCandidate,
-                action,
-                snapshot.currentIntent,
-                { track: options.track, profileGenres },
-              );
-            }
-          }
-        } else if (
-          searchCandidate &&
-          ["LISTENED_20S", "LIKE", "SKIP", "REPLAY", "DISLIKE"].includes(type)
-        ) {
-          searchCandidate = applySearchCandidateConfidence(
-            searchCandidate,
-            action,
-            snapshot.currentIntent,
-            { track: options?.track, profileGenres },
-          );
-        }
-
-        const intentDecision =
-          searchCandidate &&
-          !intentsAlign(snapshot.currentIntent, searchCandidate.intent)
-            ? `Browsing “${searchCandidate.intent}” from search — your session stays on ${snapshot.currentIntent}`
-            : snapshot.intentDecision;
-
-        const next: SessionState = {
-          ...snapshot,
-          recentActions: [...snapshot.recentActions, action].slice(-MAX_RECENT_ACTIONS),
-          searchCandidate,
-          lastSearchQuery,
-          candidateIntent:
-            searchCandidate &&
-            !intentsAlign(snapshot.currentIntent, searchCandidate.intent)
-              ? searchCandidate.intent
-              : snapshot.candidateIntent,
-          intentDecision,
-        };
-
-        persistSession(next);
-        if (
-          searchCandidate &&
-          !intentsAlign(snapshot.currentIntent, searchCandidate.intent) &&
-          type === "LISTENED_20S"
-        ) {
-          showLearningNotice(
-            `Search browse: ${searchCandidate.intent} — session mood unchanged`,
-          );
-        }
-
-        if (["LIKE", "UNLIKE", "DISLIKE", "SKIP", "REPLAY"].includes(type)) {
-          void runDiscoveryAdaptation(type, value);
-        }
-        return;
-      }
-
-      if (
-        !isSearchLane &&
-        !deferPlayConfidence &&
-        (type === "PLAY" || type === "LISTENED_20S")
-      ) {
-        searchCandidate = decaySearchCandidateOnPrimaryActivity(searchCandidate);
-      }
-
-      if (
-        !deferPlayConfidence &&
-        options?.track &&
-        (type === "PLAY" || type === "LISTENED_20S") &&
-        intentsAlign(snapshot.currentIntent, candidateIntent) &&
-        (reinforcesSession ||
-          trackMatchesPredictedIntent(
-            options.track,
-            snapshot.currentIntent,
-            profileGenres,
-          ))
-      ) {
-        evidenceRef.current = {
-          ...evidenceRef.current,
-          listeningShiftIntent: null,
-          listeningShiftPlayCount: 0,
-        };
-      } else if (
-        !deferPlayConfidence &&
-        options?.track &&
-        (type === "PLAY" || type === "LISTENED_20S")
-      ) {
-        const shiftResult = applyListeningCandidateShift(
-          evidenceRef.current,
-          options.track,
-          snapshot.currentIntent,
-          candidateIntent,
+        const profileGenres = profileRef.current.genres;
+        const seed = applySearchCandidateSeed(
+          snapshot,
+          query,
           profileGenres,
+          knownArtists,
+          action.timestamp,
         );
-        evidenceRef.current = shiftResult.evidence;
-        candidateIntent = shiftResult.candidateIntent;
-        if (shiftResult.retargeted) {
-          intentConfidence = Math.min(
-            100,
-            intentConfidence + shiftResult.confidenceBoost,
+        persistSession({
+          ...snapshot,
+          recentActions: [...snapshot.recentActions, action].slice(-MAX_RECENT_ACTIONS),
+          lastSearchQuery: query || snapshot.lastSearchQuery,
+          candidateIntent: seed.candidateIntent,
+          candidateConfidence: seed.candidateConfidence,
+          intentDecision: seed.intentDecision,
+          evidence: seed.evidenceEntry
+            ? [...snapshot.evidence, seed.evidenceEntry].slice(-50)
+            : snapshot.evidence,
+          confidenceTimeline: seed.timelineEntry
+            ? [...snapshot.confidenceTimeline, seed.timelineEntry].slice(-30)
+            : snapshot.confidenceTimeline,
+        });
+        if (seed.created) {
+          showLearningNotice(
+            `Exploring “${seed.candidateIntent}” from search — listen to build toward ${INTENT_CONFIDENCE_THRESHOLD} points`,
           );
-          listeningShiftMessage = shiftResult.message;
-        } else if (shiftResult.message && type === "PLAY") {
-          listeningShiftMessage = shiftResult.message;
         }
+        return;
+      }
+
+      if (type === "SEARCH_ARTIST") {
+        const query = value.trim();
+        const nextArtists = query
+          ? mergePreferredArtists(snapshot.preferredArtists, [query])
+          : snapshot.preferredArtists;
+        persistSession({
+          ...snapshot,
+          preferredArtists: nextArtists,
+          recentActions: [...snapshot.recentActions, action].slice(-MAX_RECENT_ACTIONS),
+        });
+        return;
       }
 
       if (!deferPlayConfidence) {
-        evidenceRef.current = applyActionToEvidence(
-          evidenceRef.current,
-          action,
-          snapshot.currentIntent,
-        );
+        evidenceRef.current = applyActionToEvidence(evidenceRef.current, action);
       }
 
-      const confidenceBefore = intentConfidence;
-      if (!deferPlayConfidence) {
-        intentConfidence = applyActionConfidence(
-          intentConfidence,
-          action,
-          candidateIntent,
-          snapshot.currentIntent,
-          {
-            track: options?.track,
-            profileGenres,
-            reinforceSession: reinforcesSession,
-          },
-        );
-      }
+      const listeningResult = applyListeningEvidence(
+        snapshot,
+        action,
+        {
+          track: options?.track,
+          profileGenres,
+          deferPlayConfidence,
+          knownArtists,
+        },
+      );
 
-      const stableMood = intentsAlign(snapshot.currentIntent, candidateIntent);
-      const onGenre20s =
-        type === "LISTENED_20S" &&
-        options?.track != null &&
-        (reinforcesSession ||
-          trackMatchesPredictedIntent(
-            options.track,
-            stableMood ? snapshot.currentIntent : candidateIntent,
-            profileGenres,
-          ));
-      const offGenre20s =
-        type === "LISTENED_20S" &&
-        options?.track != null &&
-        !onGenre20s &&
-        (options.track.primary_genre != null ||
-          (options.track.artists[0]?.genres[0] ?? null) != null);
-
-      const intentDecision = offGenre20s
-        ? `20s listen doesn't match ${stableMood ? snapshot.currentIntent : candidateIntent} genres — ${OFF_GENRE_SUSTAINED_LISTEN_DECAY} points removed`
-        : onGenre20s && stableMood && intentConfidence > confidenceBefore
-          ? `20s listen matches ${snapshot.currentIntent} — reinforcing your session`
-          : listeningShiftMessage?.includes("candidate intent updated")
-            ? listeningShiftMessage
-            : computeIntentDecision(
-                snapshot.currentIntent,
-                candidateIntent,
-                intentConfidence,
-              );
-
-      const next: SessionState = {
+      let next: SessionState = {
         ...snapshot,
         recentActions: [...snapshot.recentActions, action].slice(-MAX_RECENT_ACTIONS),
-        candidateIntent,
-        intentConfidence,
-        searchCandidate,
-        lastSearchQuery,
-        intentDecision,
+        candidateIntent: listeningResult.candidateIntent,
+        candidateConfidence: listeningResult.candidateConfidence,
         interactionsCollected: evidenceRef.current.interactionsCollected,
         explicitPreferenceSignals: evidenceRef.current.explicitPreferenceSignals,
-        listeningShiftIntent: evidenceRef.current.listeningShiftIntent,
-        listeningShiftPlayCount: evidenceRef.current.listeningShiftPlayCount,
+        intentDecision: computeIntentDecision(
+          snapshot.currentIntent,
+          listeningResult.candidateIntent,
+          listeningResult.candidateConfidence,
+        ),
+        evidence: listeningResult.evidenceEntry
+          ? [...snapshot.evidence, listeningResult.evidenceEntry].slice(-50)
+          : snapshot.evidence,
+        confidenceTimeline: listeningResult.timelineEntry
+          ? [...snapshot.confidenceTimeline, listeningResult.timelineEntry].slice(-30)
+          : snapshot.confidenceTimeline,
       };
 
-      const promotedPrimary =
-        !deferPlayConfidence &&
-        shouldApplyIntentChange(
-          intentConfidence,
-          snapshot.currentIntent,
-          candidateIntent,
-        )
-          ? candidateIntent
-          : null;
-
-      if (promotedPrimary) {
-        const beforeIntent = snapshot.currentIntent;
-        const reason = `Listening behaviour reached ${INTENT_CONFIDENCE_THRESHOLD} points for "${promotedPrimary}".`;
+      if (listeningResult.shouldPromote && listeningResult.candidateIntent) {
+        const beforeIntent = snapshot.currentIntent ?? GENERAL_LISTENING_INTENT;
+        const reason =
+          listeningResult.promotionReason ??
+          `Listening behaviour reached ${INTENT_CONFIDENCE_THRESHOLD} points for "${listeningResult.candidateIntent}".`;
         const promotedNext = buildPromotedSessionState(
           next,
-          promotedPrimary,
-          intentConfidence,
+          listeningResult.candidateIntent,
           reason,
         );
         evidenceRef.current = createEvidenceSnapshot();
         const entry: IntentHistoryEntry = {
           timestamp: Date.now(),
-          intent: promotedPrimary,
-          confidence: promotedNext.confidence,
+          intent: listeningResult.candidateIntent,
+          confidence: 1,
           reason,
         };
         const nextHistory = [...intentHistoryRef.current, entry].slice(-20);
         intentHistoryRef.current = nextHistory;
         setIntentHistory(nextHistory);
         persistSession(promotedNext, nextHistory);
-        showLearningNotice(`Switching to ${promotedPrimary}`);
-        void showIntentPromotionFlow(beforeIntent, promotedPrimary, reason);
+        void showIntentPromotionFlow(beforeIntent, listeningResult.candidateIntent, reason);
 
         if (["LIKE", "UNLIKE", "DISLIKE", "SKIP", "REPLAY"].includes(type)) {
           void runDiscoveryAdaptation(type, value);
@@ -1344,11 +1183,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       const learningMessage = deferPlayConfidence
         ? null
-        : offGenre20s
-          ? `Off-genre for ${stableMood ? snapshot.currentIntent : candidateIntent} — ${OFF_GENRE_SUSTAINED_LISTEN_DECAY} points removed`
-          : onGenre20s && stableMood && type === "LISTENED_20S"
-            ? `Matches ${snapshot.currentIntent} — session reinforced`
-            : listeningShiftMessage ?? learningMessageForAction(type);
+        : learningMessageForAction(type);
       if (learningMessage) {
         showLearningNotice(learningMessage);
       }
@@ -1411,33 +1246,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     },
     [persistSession],
   );
-
-  useEffect(() => {
-    const feedIntent = feedQuery?.trim();
-    if (!feedIntent || recommendations.length === 0 || needsIntentPrompt) {
-      return;
-    }
-    if (lastSyncedFeedQuery.current === feedIntent) {
-      return;
-    }
-    const mappedIntent = mapSearchToCandidateIntent(feedIntent);
-    if (!mappedIntent || intentsAlign(sessionRef.current.currentIntent, mappedIntent)) {
-      lastSyncedFeedQuery.current = feedIntent;
-      return;
-    }
-
-    persistSession({
-      ...sessionRef.current,
-      candidateIntent: mappedIntent,
-      intentConfidence: Math.min(
-        sessionRef.current.intentConfidence + 15,
-        INTENT_CONFIDENCE_THRESHOLD - 1,
-      ),
-      intentDecision: "Waiting for more evidence",
-      aiReason: `Recommendations were generated for "${mappedIntent}". Gathering evidence before changing intent.`,
-    });
-    lastSyncedFeedQuery.current = feedIntent;
-  }, [feedQuery, needsIntentPrompt, persistSession, recommendations.length]);
 
   useEffect(() => {
     return () => {

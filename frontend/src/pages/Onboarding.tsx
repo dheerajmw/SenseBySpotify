@@ -10,6 +10,8 @@ import {
 import { useProfile } from "../contexts/ProfileContext";
 import { useRecommendations } from "../contexts/RecommendationsContext";
 import { useSession } from "../hooks/useSession";
+import { buildRecommendationQuery } from "../utils/recommendationContext";
+import { resolveUserDeclaredIntent } from "../utils/userIntentInput";
 import type { Artist, FavouriteArtist } from "../types";
 
 const GENERATING_MESSAGES = [
@@ -95,17 +97,24 @@ export default function Onboarding() {
 
     async function finishOnboarding() {
       const intent = currentIntent.trim();
+      const resolved = resolveUserDeclaredIntent(intent, {
+        knownArtists: selectedArtists.map((artist) => artist.name),
+        profileGenres: selectedGenres,
+      });
+      const sessionIntent = resolved.accepted ? resolved.intent : intent;
       const nextProfile = {
         genres: selectedGenres,
         favouriteArtists: selectedArtists,
         noveltyTolerance,
-        currentIntent: intent,
+        currentIntent: sessionIntent,
       };
 
       updateProfile(nextProfile);
       completeOnboarding();
       setSessionIntent(intent, {
-        reason: "Initial intent from onboarding profile.",
+        reason: resolved.accepted
+          ? `Session tuned for ${resolved.displayLabel}.`
+          : "Initial intent from onboarding profile.",
         bumpVersion: true,
         userDeclared: true,
       });
@@ -113,8 +122,13 @@ export default function Onboarding() {
 
       try {
         const response = await api.generateRecommendations(
-          { ...profile, ...nextProfile, onboardingCompleted: true },
-          intent,
+          {
+            ...profile,
+            ...nextProfile,
+            onboardingCompleted: true,
+            preferredGenres: resolved.preferredGenres,
+          },
+          buildRecommendationQuery(sessionIntent, resolved.preferredGenres),
         );
         if (!cancelled) {
           setFeed(response);

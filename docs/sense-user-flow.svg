@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="2000" viewBox="0 0 1280 2000">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#374151"/>
+    </marker>
+    <style>
+      .title { font: 700 26px system-ui, sans-serif; fill: #111827; }
+      .subtitle { font: 400 14px system-ui, sans-serif; fill: #6B7280; }
+      .phase { font: 700 12px system-ui, sans-serif; fill: #059669; letter-spacing: 0.06em; }
+      .box { fill: #FFFFFF; stroke: #D1D5DB; stroke-width: 1.5; }
+      .prompt { fill: #ECFDF5; stroke: #10B981; stroke-width: 2; }
+      .block { fill: #FEF2F2; stroke: #EF4444; stroke-width: 1.5; stroke-dasharray: 4 3; }
+      .decision { fill: #FFFBEB; stroke: #F59E0B; stroke-width: 1.5; }
+      .route { fill: #F0FDF4; stroke: #22C55E; stroke-width: 1.5; }
+      .action { fill: #F9FAFB; stroke: #9CA3AF; stroke-width: 1.5; }
+      .end { fill: #EFF6FF; stroke: #3B82F6; stroke-width: 1.5; }
+      .label { font: 600 14px system-ui, sans-serif; fill: #111827; }
+      .small { font: 400 11px system-ui, sans-serif; fill: #4B5563; }
+      .edge { font: 500 11px system-ui, sans-serif; fill: #6B7280; }
+      .note { font: 400 11px system-ui, sans-serif; fill: #6B7280; font-style: italic; }
+      .line { stroke: #374151; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+      .dash { stroke: #6B7280; stroke-width: 1.8; fill: none; stroke-dasharray: 8 5; marker-end: url(#arrow); }
+      .loop-label { font: 600 11px system-ui, sans-serif; fill: #059669; }
+      .connector { stroke: #374151; stroke-width: 1.5; fill: none; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="2000" fill="#FFFFFF"/>
+
+  <text x="640" y="48" text-anchor="middle" class="title">Sense by Spotify - Complete User Flow</text>
+  <text x="640" y="72" text-anchor="middle" class="subtitle">Matches current app behaviour (intent prompt = only setup input)</text>
+
+  <!-- A: Entry -->
+  <text x="56" y="108" class="phase">A. APP ENTRY</text>
+
+  <rect x="490" y="118" width="300" height="40" rx="8" class="box"/>
+  <text x="640" y="144" text-anchor="middle" class="label">Splash overlay (1.2s)</text>
+
+  <path d="M640 158 L640 182" class="line"/>
+
+  <polygon points="640,182 700,222 640,262 580,222" class="decision"/>
+  <text x="640" y="218" text-anchor="middle" class="small">onboardingCompleted?</text>
+  <text x="640" y="232" text-anchor="middle" class="small">(localStorage profile)</text>
+
+  <path d="M580 222 L300 222 L300 278" class="line"/>
+  <text x="320" y="214" class="edge">No - first time</text>
+  <rect x="140" y="278" width="320" height="40" rx="8" class="route"/>
+  <text x="300" y="304" text-anchor="middle" class="label">/welcome</text>
+
+  <path d="M300 318 L300 348" class="line"/>
+  <rect x="140" y="348" width="320" height="40" rx="8" class="action"/>
+  <text x="300" y="374" text-anchor="middle" class="label">Tap Get Started</text>
+
+  <path d="M700 222 L980 222 L980 278" class="line"/>
+  <text x="720" y="214" class="edge">Yes - returning user</text>
+  <rect x="820" y="278" width="320" height="40" rx="8" class="route"/>
+  <text x="980" y="304" text-anchor="middle" class="label">/ redirects to /home</text>
+
+  <path d="M300 388 L300 430 L640 430 L980 430 L980 318" class="line"/>
+  <rect x="520" y="430" width="240" height="40" rx="8" class="route"/>
+  <text x="640" y="456" text-anchor="middle" class="label">Navigate /home (Layout)</text>
+
+  <!-- B: Intent gate -->
+  <text x="56" y="508" class="phase">B. SESSION INTENT GATE (blocks all nav until done)</text>
+
+  <path d="M640 470 L640 520" class="line"/>
+
+  <polygon points="640,520 710,564 640,608 570,564" class="decision"/>
+  <text x="640" y="560" text-anchor="middle" class="small">intentDeclaredThisSession?</text>
+  <text x="640" y="574" text-anchor="middle" class="small">(sessionStorage, per tab)</text>
+
+  <path d="M570 564 L320 564 L320 640" class="line"/>
+  <text x="340" y="556" class="edge">No</text>
+  <text x="340" y="580" class="edge">first load, new tab, or 2h idle</text>
+
+  <rect x="120" y="640" width="400" height="228" rx="12" class="prompt"/>
+  <text x="320" y="668" text-anchor="middle" class="label">SessionIntentPrompt (full-screen modal)</text>
+  <text x="320" y="692" text-anchor="middle" class="small">Overlays /home - cannot browse behind it</text>
+  <text x="320" y="716" text-anchor="middle" class="small">Mood chips OR free-text prompt</text>
+  <text x="320" y="740" text-anchor="middle" class="small">Suggestion chips below textarea</text>
+  <text x="320" y="764" text-anchor="middle" class="small">Parse to canonical mood + preferredGenres</text>
+  <text x="320" y="788" text-anchor="middle" class="small">POST /generate-recommendations</text>
+  <text x="320" y="812" text-anchor="middle" class="small">establishSessionIntent()</text>
+  <text x="320" y="840" text-anchor="middle" class="label">Navigate to /feed</text>
+
+  <path d="M710 564 L920 564 L920 640" class="line"/>
+  <text x="730" y="556" class="edge">Yes</text>
+  <text x="730" y="580" class="edge">same-tab refresh</text>
+  <rect x="780" y="640" width="280" height="52" rx="8" class="box"/>
+  <text x="920" y="662" text-anchor="middle" class="label">Skip modal</text>
+  <text x="920" y="680" text-anchor="middle" class="small">Restore session + feed from sessionStorage</text>
+
+  <path d="M320 868 L320 910 L640 910 L920 910 L920 692" class="line"/>
+
+  <!-- C: Main app -->
+  <text x="56" y="948" class="phase">C. MAIN APP (after intent declared)</text>
+
+  <rect x="240" y="962" width="800" height="56" rx="10" class="box"/>
+  <text x="640" y="986" text-anchor="middle" class="label">Nav: Home | Feed | Search | AI Discovery | Now Playing</text>
+  <text x="640" y="1006" text-anchor="middle" class="small">Global search bar and player bar always visible</text>
+
+  <path d="M640 1018 L640 1050" class="line"/>
+
+  <rect x="280" y="1050" width="720" height="72" rx="10" class="action"/>
+  <text x="640" y="1076" text-anchor="middle" class="label">Play 30s iTunes previews (feed, search, or queue)</text>
+  <text x="640" y="1096" text-anchor="middle" class="small">logAction: PLAY, LISTENED_20S (20s), LIKE, SKIP, DISLIKE, SEARCH</text>
+  <text x="640" y="1114" text-anchor="middle" class="small">Search updates lastSearchQuery; may seed candidateIntent (+12) only</text>
+
+  <path d="M640 1122 L640 1160" class="line"/>
+
+  <polygon points="640,1160 710,1204 640,1248 570,1204" class="decision"/>
+  <text x="640" y="1198" text-anchor="middle" class="small">Listening builds candidateConfidence</text>
+  <text x="640" y="1214" text-anchor="middle" class="small">&gt;= 75 and mood shift?</text>
+
+  <path d="M570 1204 L400 1204 L400 1276" class="line"/>
+  <text x="420" y="1196" class="edge">No</text>
+  <rect x="280" y="1276" width="240" height="48" rx="8" class="action"/>
+  <text x="400" y="1306" text-anchor="middle" class="label">Keep current mood</text>
+
+  <path d="M710 1204 L880 1204 L880 1276" class="line"/>
+  <text x="792" y="1188" class="edge">Yes</text>
+  <rect x="760" y="1276" width="240" height="48" rx="8" class="end"/>
+  <text x="880" y="1298" text-anchor="middle" class="label">IntentChangeModal</text>
+  <text x="880" y="1314" text-anchor="middle" class="small">Feed refresh</text>
+
+  <path d="M400 1324 L400 1360" class="line"/>
+  <path d="M880 1324 L880 1360" class="line"/>
+  <path d="M400 1360 L880 1360" class="connector"/>
+
+  <rect x="280" y="1360" width="720" height="64" rx="10" class="box"/>
+  <text x="640" y="1386" text-anchor="middle" class="label">Autoplay chain, like/dislike, feedback chips, discovery slider</text>
+  <text x="640" y="1406" text-anchor="middle" class="small">Home shows feed subset when query matches intent; Feed shows full ranked list</text>
+
+  <!-- D: Optional side path (not on main spine) -->
+  <path d="M1040 990 L1100 990 L1100 1010" class="dash"/>
+  <text x="1060" y="982" class="edge">optional</text>
+  <rect x="1020" y="1010" width="220" height="72" rx="8" class="route"/>
+  <text x="1130" y="1036" text-anchor="middle" class="small">D. AI Discovery</text>
+  <text x="1130" y="1056" text-anchor="middle" class="small">Same prompt UX</text>
+  <text x="1130" y="1074" text-anchor="middle" class="small">establishSessionIntent</text>
+
+  <!-- E: Session reset -->
+  <text x="56" y="1468" class="phase">E. SESSION RESET</text>
+
+  <path d="M640 1424 L640 1590" class="line"/>
+
+  <polygon points="640,1590 710,1634 640,1678 570,1634" class="decision"/>
+  <text x="640" y="1628" text-anchor="middle" class="small">New browser tab</text>
+  <text x="640" y="1644" text-anchor="middle" class="small">OR idle &gt; 2 hours?</text>
+
+  <path d="M570 1634 L200 1634 L200 1090 L280 1090" class="dash"/>
+  <text x="480" y="1626" class="edge">No</text>
+  <text x="168" y="1362" class="loop-label" transform="rotate(-90 168 1362)">Loop: continue listening</text>
+
+  <path d="M710 1634 L900 1634 L900 1700" class="line"/>
+  <text x="792" y="1626" class="edge">Yes</text>
+  <rect x="760" y="1700" width="280" height="72" rx="8" class="end"/>
+  <text x="900" y="1726" text-anchor="middle" class="label">New session in tab</text>
+  <text x="900" y="1746" text-anchor="middle" class="small">Clear feed, intentDeclared=false</text>
+  <text x="900" y="1764" text-anchor="middle" class="small">Back to Step B (modal on /home)</text>
+
+  <path d="M900 1772 L900 1788 L1150 1788 L1150 564 L710 564" class="dash"/>
+  <text x="1170" y="1180" class="loop-label" transform="rotate(90 1170 1180)">Loop: return to Step B</text>
+
+  <!-- Legend -->
+  <rect x="56" y="1780" width="1168" height="150" rx="12" fill="#FAFAFA" stroke="#E5E7EB"/>
+  <text x="88" y="1810" class="label">Legend</text>
+  <path d="M88 1830 L148 1830" class="line"/>
+  <text x="160" y="1834" class="small">Solid arrow = main flow (forward step)</text>
+  <path d="M88 1854 L148 1854" class="dash"/>
+  <text x="160" y="1858" class="small">Dashed arrow = loop or optional branch</text>
+  <text x="88" y="1882" class="small">1. No genre/artist wizard - only the intent modal collects user input at session start.</text>
+  <text x="88" y="1904" class="small">2. Modal blocks /home until intent submitted (same-tab refresh restores session and skips modal).</text>
+  <text x="88" y="1926" class="small">3. AI Discovery (optional) branches from nav - it is not a required step on the main spine.</text>
+</svg>
