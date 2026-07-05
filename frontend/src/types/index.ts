@@ -183,6 +183,8 @@ export interface SessionState {
   personalizedSecondSongUsed: boolean;
   /** User explicitly chose session intent this visit (via prompt or establishSessionIntent). */
   intentDeclaredThisSession: boolean;
+  /** Raw text the user submitted when declaring session intent (AI Discovery / prompt). */
+  declaredUserInput: string | null;
 }
 
 export interface IntentValidationDebug {
@@ -210,4 +212,15 @@ export interface UpdateSessionIntentResponse {
   validation_status?: "accepted" | "rejected";
   validation_message?: string | null;
   raw_new_intent?: string | null;
+}
+
+export interface ParseUserIntentResponse {
+  accepted: boolean;
+  intent: string;
+  preferred_artists: string[];
+  preferred_genres: string[];
+  display_label: string;
+  reason: string;
+  rejection_reason?: string | null;
+  source?: "rules" | "llm" | "llm_rejected";
 }

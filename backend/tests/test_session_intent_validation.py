@@ -1,3 +1,5 @@
+import pytest
+
 from app.services.session_intent_validation import (
     extract_intent_from_text,
     is_likely_artist_name,
@@ -108,3 +110,64 @@ def test_validate_proposed_intent_rejects_taylor_swift():
     assert result["accepted"] is False
     assert result["intent"] == "Focus"
     assert "Taylor Swift" in result["preferred_artists"]
+
+
+def test_validate_proposed_intent_maps_fun_alias_to_happy():
+    result = validate_proposed_intent(
+        "FUN",
+        current_intent="Focus",
+        known_artists=set(),
+    )
+
+    assert result["accepted"] is True
+    assert result["intent"] == "Happy"
+    assert result["intent_changed"] is True
+
+
+@pytest.mark.parametrize(
+    ("raw_intent", "expected"),
+    [
+        ("COOL", "Calm"),
+        ("Chill", "Calm"),
+        ("Vibes", "Calm"),
+        ("Hype", "High Energy"),
+        ("Emotional", "Melancholic"),
+        ("Zen", "Meditation"),
+        ("Gym", "Workout"),
+        ("Date Night", "Romantic"),
+    ],
+)
+def test_validate_proposed_intent_maps_common_aliases(raw_intent: str, expected: str):
+    result = validate_proposed_intent(
+        raw_intent,
+        current_intent="Focus",
+        known_artists=set(),
+    )
+
+    assert result["accepted"] is True
+    assert result["intent"] == expected
+
+
+def test_extract_intent_from_descriptive_high_notes():
+    assert extract_intent_from_text("SONG WITH HIGH NOTES") == "Romantic"
+
+
+def test_sanitize_accepts_fun_ai_intent_as_happy():
+    sanitized = sanitize_session_intent_result(
+        {
+            "intent_changed": True,
+            "new_intent": "FUN",
+            "preferred_artists": [],
+            "preferred_genres": [],
+            "confidence": 0.88,
+            "reason": "User is listening to upbeat party tracks.",
+        },
+        current_intent="Focus",
+        profile_artists=[],
+        profile_genres=[],
+        recommendation_artists=[],
+    )
+
+    assert sanitized["new_intent"] == "Happy"
+    assert sanitized["intent_changed"] is True
+    assert sanitized["validation_status"] == "accepted"

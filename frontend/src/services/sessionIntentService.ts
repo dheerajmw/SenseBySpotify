@@ -1,10 +1,12 @@
 import { apiRequest } from "../api/client";
 import type {
   LocalUserProfile,
+  ParseUserIntentResponse,
   Recommendation,
   SessionState,
   UpdateSessionIntentResponse,
 } from "../types";
+import { resolveTrackGenre } from "../utils/track";
 
 function toProfilePayload(profile: LocalUserProfile) {
   return {
@@ -47,9 +49,23 @@ function toRecommendationSummary(recommendations: Recommendation[]) {
   return recommendations.slice(0, 8).map((item) => ({
     title: item.track.name,
     artist: item.track.artists.map((artist) => artist.name).join(", "),
+    genre: resolveTrackGenre(item.track),
     rank: item.rank,
     reason: item.reason,
   }));
+}
+
+export async function parseUserDeclaredIntent(
+  profile: LocalUserProfile,
+  userInput: string,
+): Promise<ParseUserIntentResponse> {
+  return apiRequest<ParseUserIntentResponse>("/parse-user-intent", {
+    method: "POST",
+    body: JSON.stringify({
+      user_input: userInput,
+      profile: toProfilePayload(profile),
+    }),
+  });
 }
 
 export async function updateSessionIntent(

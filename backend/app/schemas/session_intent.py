@@ -37,3 +37,19 @@ class UpdateSessionIntentResponse(BaseModel):
     validation_status: str = "accepted"
     validation_message: str | None = None
     raw_new_intent: str | None = None
+
+
+class ParseUserIntentRequest(BaseModel):
+    user_input: str = Field(min_length=1)
+    profile: UserProfilePayload
+
+
+class ParseUserIntentResponse(BaseModel):
+    accepted: bool
+    intent: str
+    preferred_artists: list[str] = Field(default_factory=list)
+    preferred_genres: list[str] = Field(default_factory=list)
+    display_label: str = ""
+    reason: str = ""
+    rejection_reason: str | None = None
+    source: str = "rules"

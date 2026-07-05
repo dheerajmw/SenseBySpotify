@@ -24,6 +24,10 @@ from app.services.ai.session_intent_prompts import (
     SESSION_INTENT_SYSTEM,
     build_session_intent_user_prompt,
 )
+from app.services.ai.user_intent_prompts import (
+    USER_INTENT_SYSTEM,
+    build_user_intent_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +198,47 @@ class OpenAIProvider:
             ],
             "confidence": min(1.0, max(0.0, float(parsed.get("confidence", 0.5)))),
             "reason": str(parsed.get("reason", "No reason provided.")).strip(),
+        }
+
+    async def parse_user_declared_intent(
+        self,
+        *,
+        user_input: str,
+        profile_genres: list[str],
+        profile_artists: list[str],
+    ) -> dict:
+        self._ensure_configured()
+
+        user_prompt = build_user_intent_prompt(
+            user_input=user_input,
+            profile_genres=profile_genres,
+            profile_artists=profile_artists,
+        )
+        messages = [
+            {"role": "system", "content": USER_INTENT_SYSTEM},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        raw = await self._chat_completion(messages)
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise AppError("AI returned invalid JSON", status_code=502) from exc
+
+        return {
+            "intent": str(parsed.get("intent", parsed.get("newIntent", ""))).strip(),
+            "preferred_artists": [
+                str(name).strip()
+                for name in parsed.get("preferred_artists", parsed.get("preferredArtists", []))
+                if str(name).strip()
+            ],
+            "preferred_genres": [
+                str(name).strip()
+                for name in parsed.get("preferred_genres", parsed.get("preferredGenres", []))
+                if str(name).strip()
+            ],
+            "confidence": min(1.0, max(0.0, float(parsed.get("confidence", 0.75)))),
+            "reason": str(parsed.get("reason", "")).strip(),
         }
 
     async def _chat_completion(self, messages: list[dict[str, str]]) -> str:

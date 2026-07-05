@@ -15,7 +15,7 @@ import {
   SESSION_STORAGE_KEY,
   SESSION_VISIT_KEY,
 } from "../constants/brand";
-import { updateSessionIntent } from "../services/sessionIntentService";
+import { parseUserDeclaredIntent, updateSessionIntent } from "../services/sessionIntentService";
 import { intentsAlign } from "../utils/intent";
 import {
   INTENT_CONFIDENCE_THRESHOLD,
@@ -39,6 +39,7 @@ import { playbackBridge } from "../utils/playbackBridge";
 import {
   formatResolvedIntentLabel,
   resolveUserDeclaredIntent,
+  type ResolvedUserDeclaredIntent,
 } from "../utils/userIntentInput";
 import { buildRecommendationRequest } from "../utils/recommendationContext";
 import { learningMessageForAction } from "../utils/sessionDisplay";
@@ -217,6 +218,7 @@ function createNewListeningSession(discoveryLevel = 50): SessionState {
     lastIntentValidation: null,
     personalizedSecondSongUsed: false,
     intentDeclaredThisSession: false,
+    declaredUserInput: null,
   };
 }
 
@@ -302,6 +304,7 @@ function normalizeSessionState(
     intentDeclaredThisSession:
       session.intentDeclaredThisSession ??
       Boolean(session.currentIntent?.trim() && (session.intentConfidence ?? 0) >= 100),
+    declaredUserInput: session.declaredUserInput ?? null,
   };
 }
 
@@ -457,7 +460,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     (
       intent: string,
       reason: string,
-      options?: { bumpVersion?: boolean; addHistory?: boolean },
+      options?: {
+        bumpVersion?: boolean;
+        addHistory?: boolean;
+        resolved?: ResolvedUserDeclaredIntent;
+        /** Allow updating session when mood matches but user gave new discovery text. */
+        force?: boolean;
+      },
     ): boolean => {
       const trimmed = intent.trim();
       if (!trimmed || isUnknownIntent(trimmed) || isDiscoveryLabel(trimmed)) {
@@ -465,22 +474,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       const profileArtists = profileRef.current.favouriteArtists.map((artist) => artist.name);
-      const resolved = resolveUserDeclaredIntent(trimmed, {
-        knownArtists: profileArtists,
-        profileGenres: profileRef.current.genres,
-      });
+      const resolved =
+        options?.resolved ??
+        resolveUserDeclaredIntent(trimmed, {
+          knownArtists: profileArtists,
+          profileGenres: profileRef.current.genres,
+        });
 
       if (!resolved.accepted) {
         return false;
       }
 
       const canonicalIntent = resolved.intent;
+      const sameDeclaredInput =
+        (sessionRef.current.declaredUserInput ?? "").trim().toLowerCase() ===
+        trimmed.toLowerCase();
 
       if (
+        !options?.force &&
         sessionRef.current.intentDeclaredThisSession &&
         hasKnownIntent(sessionRef.current.currentIntent) &&
         sessionRef.current.currentIntent &&
-        intentsAlign(sessionRef.current.currentIntent, canonicalIntent)
+        intentsAlign(sessionRef.current.currentIntent, canonicalIntent) &&
+        sameDeclaredInput
       ) {
         return false;
       }
@@ -499,14 +515,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         intentDeclaredThisSession: true,
         interactionsCollected: 0,
         explicitPreferenceSignals: 0,
-        preferredArtists: mergePreferredArtists(
-          sessionRef.current.preferredArtists,
-          resolved.preferredArtists,
-        ),
-        preferredGenres: mergePreferredGenres(
-          sessionRef.current.preferredGenres,
-          resolved.preferredGenres,
-        ),
+        preferredArtists: options?.force
+          ? resolved.preferredArtists
+          : mergePreferredArtists(
+              sessionRef.current.preferredArtists,
+              resolved.preferredArtists,
+            ),
+        preferredGenres: options?.force
+          ? resolved.preferredGenres
+          : mergePreferredGenres(
+              sessionRef.current.preferredGenres,
+              resolved.preferredGenres,
+            ),
+        declaredUserInput: trimmed,
         confidence: Math.max(sessionRef.current.confidence, 0.8),
         aiReason: reason || `Session tuned for ${displayLabel}.`,
         intentDecision: `Listening for "${canonicalIntent}"`,
@@ -653,10 +674,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       const profileArtists = profileRef.current.favouriteArtists.map((artist) => artist.name);
-      const resolved = resolveUserDeclaredIntent(trimmed, {
+      let resolved = resolveUserDeclaredIntent(trimmed, {
         knownArtists: profileArtists,
         profileGenres: profileRef.current.genres,
       });
+
+      if (!resolved.accepted) {
+        try {
+          const parsed = await parseUserDeclaredIntent(profileRef.current, trimmed);
+          if (parsed.accepted) {
+            resolved = {
+              accepted: true,
+              intent: parsed.intent,
+              preferredGenres: parsed.preferred_genres,
+              preferredArtists: parsed.preferred_artists,
+              displayLabel: parsed.display_label || parsed.intent,
+              rejectionReason: null,
+            };
+          } else if (parsed.rejection_reason) {
+            throw new Error(parsed.rejection_reason);
+          }
+        } catch (err) {
+          if (err instanceof Error && err.message && !resolved.accepted) {
+            throw err;
+          }
+        }
+      }
 
       if (!resolved.accepted) {
         throw new Error(
@@ -672,7 +715,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const established = applyUserDeclaredIntent(
         trimmed,
         `Session tuned for ${displayLabel}.`,
-        { bumpVersion: true },
+        { bumpVersion: true, resolved, force: true },
       );
       if (!established) {
         throw new Error("Could not start listening session with that intent.");

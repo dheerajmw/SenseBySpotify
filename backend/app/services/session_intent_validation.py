@@ -43,6 +43,8 @@ MOOD_KEYWORD_TO_INTENT: dict[str, str] = {
     "energy": "High Energy",
     "energetic": "High Energy",
     "happy": "Happy",
+    "fun": "Happy",
+    "soft": "Calm",
     "sad": "Melancholic",
     "melanchol": "Melancholic",
     "meditat": "Meditation",
@@ -50,6 +52,68 @@ MOOD_KEYWORD_TO_INTENT: dict[str, str] = {
     "read": "Reading",
     "reading": "Reading",
 }
+
+# Natural-language phrases that imply a session mood (longest match first).
+DESCRIPTIVE_PHRASE_TO_INTENT: tuple[tuple[str, str], ...] = (
+    ("high notes", "Romantic"),
+    ("high note", "Romantic"),
+    ("powerful vocal", "Romantic"),
+    ("powerful vocals", "Romantic"),
+    ("vocal range", "Romantic"),
+    ("falsetto", "Romantic"),
+    ("slow song", "Relaxing"),
+    ("slow songs", "Relaxing"),
+    ("wind down", "Relaxing"),
+    ("pump up", "High Energy"),
+    ("pump me up", "High Energy"),
+    ("get hyped", "High Energy"),
+    ("feel good", "Happy"),
+    ("road trip", "Road Trip"),
+    ("rainy day", "Rainy Evening"),
+    ("late night", "Late Night"),
+    ("deep work", "Focus"),
+    ("heart break", "Melancholic"),
+    ("heartbreak", "Melancholic"),
+    ("break up", "Melancholic"),
+    ("breakup", "Melancholic"),
+    ("to code", "Coding"),
+    ("while coding", "Coding"),
+    ("to study", "Study"),
+    ("while studying", "Study"),
+    ("to workout", "Workout"),
+    ("while working out", "Workout"),
+    ("to sleep", "Sleep"),
+    ("fall asleep", "Sleep"),
+    ("to drive", "Driving"),
+    ("while driving", "Driving"),
+    ("fun time", "Happy"),
+    ("good time", "Happy"),
+    ("soft song", "Calm"),
+    ("soft songs", "Calm"),
+    ("soft music", "Calm"),
+    ("easy listening", "Relaxing"),
+)
+
+
+def infer_intent_from_descriptive_phrase(text: str) -> str | None:
+    normalized = text.lower()
+    matches: list[str] = []
+    for phrase, intent in sorted(DESCRIPTIVE_PHRASE_TO_INTENT, key=lambda item: -len(item[0])):
+        if phrase in normalized:
+            matches.append(intent)
+    return _pick_best_intent_match(matches)
+
+
+_UPBEAT_INTENTS = frozenset({"Happy", "Party", "High Energy", "Festival", "Workout"})
+
+
+def _pick_best_intent_match(matches: list[str]) -> str | None:
+    if not matches:
+        return None
+    for intent in matches:
+        if intent in _UPBEAT_INTENTS:
+            return intent
+    return matches[0]
 
 
 def extract_intent_from_text(text: str) -> str | None:
@@ -60,6 +124,10 @@ def extract_intent_from_text(text: str) -> str | None:
     direct = canonical_intent(text)
     if direct:
         return direct
+
+    descriptive = infer_intent_from_descriptive_phrase(text)
+    if descriptive:
+        return descriptive
 
     for keyword, intent in sorted(MOOD_KEYWORD_TO_INTENT.items(), key=lambda item: -len(item[0])):
         if keyword in normalized:

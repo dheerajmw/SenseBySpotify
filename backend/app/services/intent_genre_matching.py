@@ -34,7 +34,7 @@ INTENT_KEYWORD_TO_GENRES: dict[str, list[str]] = {
     "latin": ["Latin", "Latino"],
     "k-pop": ["K-Pop", "Pop"],
     "kpop": ["K-Pop", "Pop"],
-    "poetry": ["Indian Pop", "Singer/Songwriter", "Spoken Word"],
+    "poetry": ["Singer/Songwriter", "Folk", "Spoken Word"],
     "ghazal": ["Indian Pop", "Indian", "World"],
     "devotional": ["Indian Pop", "Devotional", "World"],
     "bhajan": ["Indian Pop", "Devotional", "World"],
@@ -53,7 +53,41 @@ PREFERRED_GENRE_TO_ITUNES: dict[str, list[str]] = {
     "sufi": ["Indian Pop", "World", "Devotional"],
     "devotional": ["Devotional", "Indian Pop", "World"],
     "bhajan": ["Devotional", "Indian Pop", "World"],
+    "poetry": ["Singer/Songwriter", "Folk", "Spoken Word"],
 }
+
+SOUTH_ASIAN_CUE_KEYWORDS = frozenset(
+    {
+        "hindi",
+        "urdu",
+        "bollywood",
+        "ghazal",
+        "shayari",
+        "punjabi",
+        "tamil",
+        "telugu",
+        "sufi",
+        "devotional",
+        "bhajan",
+        "indian",
+        "nazm",
+    }
+)
+
+CULTURAL_PROFILE_GENRE_MARKERS = frozenset(
+    {
+        "bollywood",
+        "indian",
+        "hindi",
+        "urdu",
+        "punjabi",
+        "tamil",
+        "telugu",
+        "ghazal",
+        "world",
+        "devotional",
+    }
+)
 
 MOODS_OVERRIDDEN_BY_CULTURAL_GENRES = frozenset(
     {"Reading", "Study", "Focus", "Calm", "Relaxing", "Meditation"},
@@ -121,17 +155,35 @@ def _map_preferred_genres_to_itunes(preferred_genres: list[str]) -> list[str]:
     return mapped
 
 
+def _has_south_asian_cue(normalized_intent: str) -> bool:
+    return any(keyword in normalized_intent for keyword in SOUTH_ASIAN_CUE_KEYWORDS)
+
+
+def _profile_genre_is_cultural(genre: str) -> bool:
+    normalized = genre.lower().replace("-", " ").replace("/", " ").strip()
+    return any(marker in normalized for marker in CULTURAL_PROFILE_GENRE_MARKERS)
+
+
 def _keyword_genres_from_text(normalized_intent: str) -> list[str]:
     targets: list[str] = []
     if not normalized_intent:
         return targets
 
+    south_asian = _has_south_asian_cue(normalized_intent)
+
     for keyword, genres in sorted(
         INTENT_KEYWORD_TO_GENRES.items(),
         key=lambda item: -len(item[0]),
     ):
-        if keyword in normalized_intent:
-            targets.extend(genres)
+        if keyword not in normalized_intent:
+            continue
+        if keyword == "poetry":
+            if south_asian:
+                targets.extend(["Indian Pop", "Bollywood", "World"])
+            else:
+                targets.extend(genres)
+            continue
+        targets.extend(genres)
 
     for genre_label in GENRE_LABELS:
         if genre_label in normalized_intent:
@@ -148,11 +200,24 @@ def resolve_target_genres(
     session_preferred = preferred_genres or []
     trimmed = intent.strip()
     normalized_intent = normalize_text(trimmed)
-    targets: list[str] = []
 
     cultural_targets = _map_preferred_genres_to_itunes(session_preferred)
     keyword_targets = _keyword_genres_from_text(normalized_intent)
     has_cultural_signal = bool(cultural_targets or keyword_targets)
+
+    if has_cultural_signal:
+        targets: list[str] = []
+        targets.extend(cultural_targets)
+        targets.extend(keyword_targets)
+        for genre in profile_genres:
+            formatted = _title_case_genre(genre)
+            if formatted and _profile_genre_is_cultural(formatted):
+                targets.append(formatted)
+        if trimmed and is_genre_label(trimmed):
+            targets.append(_title_case_genre(trimmed))
+        return _dedupe_preserve_order(targets)[:8]
+
+    targets: list[str] = []
 
     for genre in profile_genres:
         formatted = _title_case_genre(genre)
@@ -162,16 +227,12 @@ def resolve_target_genres(
     if trimmed and is_genre_label(trimmed):
         targets.append(_title_case_genre(trimmed))
 
-    if cultural_targets:
-        targets.extend(cultural_targets)
-
     if keyword_targets:
         targets.extend(keyword_targets)
 
     canonical = extract_intent_from_text(trimmed)
     if canonical and canonical in MOOD_INTENT_TO_GENRES:
-        if not (has_cultural_signal and canonical in MOODS_OVERRIDDEN_BY_CULTURAL_GENRES):
-            targets.extend(MOOD_INTENT_TO_GENRES[canonical])
+        targets.extend(MOOD_INTENT_TO_GENRES[canonical])
 
     if trimmed and normalize_text(trimmed) == normalize_text(GENERAL_LISTENING_INTENT):
         return _dedupe_preserve_order([_title_case_genre(genre) for genre in profile_genres[:4]]) or ["Pop"]
@@ -194,6 +255,7 @@ def build_genre_first_search_queries(
     """Build iTunes queries that discover by genre/mood, not song-title keywords."""
     target_genres = resolve_target_genres(intent, profile_genres, preferred_genres)
     queries: list[str] = []
+    normalized_intent = normalize_text(intent)
 
     for genre in target_genres:
         queries.append(genre)
@@ -206,8 +268,20 @@ def build_genre_first_search_queries(
         for genre in mapped[:2]:
             queries.append(f"{genre} {label}".strip())
 
+    if _has_south_asian_cue(normalized_intent) and any(
+        cue in normalized_intent for cue in ("poetry", "ghazal", "shayari", "nazm")
+    ):
+        queries.extend(
+            [
+                "hindi ghazal",
+                "urdu ghazal",
+                "bollywood romantic",
+                "indian pop ballad",
+            ]
+        )
+
     canonical = extract_intent_from_text(intent)
-    if canonical and canonical in MOOD_INTENT_TO_GENRES:
+    if canonical and canonical in MOOD_INTENT_TO_GENRES and not _has_south_asian_cue(normalized_intent):
         anchor_genre = target_genres[0] if target_genres else MOOD_INTENT_TO_GENRES[canonical][0]
         queries.append(f"{anchor_genre} {canonical.lower()}")
 

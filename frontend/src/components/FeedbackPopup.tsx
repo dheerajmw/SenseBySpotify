@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { FeedbackChip, Recommendation } from "../types";
+import { trackLabel } from "../utils/track";
 
 const CHIP_OPTIONS: Array<{ id: FeedbackChip; label: string }> = [
   { id: "mood", label: "Mood" },
@@ -47,10 +48,7 @@ export default function FeedbackPopup({
         <h3 id="feedback-popup-title" className="mt-2 text-xl font-semibold">
           What stood out?
         </h3>
-        <p className="mt-1 text-sm text-zinc-400">
-          {recommendation.track.name} ·{" "}
-          {recommendation.track.artists.map((artist) => artist.name).join(", ")}
-        </p>
+        <p className="mt-1 text-sm text-zinc-400">{trackLabel(recommendation.track)}</p>
 
         <div className="mt-6 flex flex-wrap gap-2" role="group" aria-label="Feedback chips">
           {CHIP_OPTIONS.map((chip) => {

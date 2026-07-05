@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { usePlayer } from "../contexts/PlayerContext";
 import { formatDuration } from "../utils/music";
+import { trackArtistLine } from "../utils/track";
 import PlayerFeedbackButtons from "./PlayerFeedbackButtons";
 
 function TransportButton({
@@ -58,7 +59,7 @@ export default function MusicPlayerBar() {
     return null;
   }
 
-  const artistNames = currentTrack.artists.map((artist) => artist.name).join(", ");
+  const artistLine = trackArtistLine(currentTrack);
   const hasNext = queueIndex < queue.length - 1 || autoplayEnabled;
   const hasPrev = queueIndex > 0;
 
@@ -80,7 +81,7 @@ export default function MusicPlayerBar() {
               <p className="truncate text-xs font-medium text-white sm:text-sm">
                 {currentTrack.name}
               </p>
-              <p className="truncate text-[10px] text-zinc-400 sm:text-xs">{artistNames}</p>
+              <p className="truncate text-[10px] text-zinc-400 sm:text-xs">{artistLine}</p>
             </div>
           </div>
 

@@ -14,6 +14,7 @@ import { useSession } from "../hooks/useSession";
 import { getActiveIntent } from "../utils/sessionLifecycle";
 import { intentsAlign } from "../utils/intent";
 import type { Recommendation } from "../types";
+import { trackLabel } from "../utils/track";
 
 export default function Home() {
   const { profile } = useProfile();
@@ -28,7 +29,7 @@ export default function Home() {
   }
 
   async function handleLike(recommendation: Recommendation) {
-    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
+    const label = trackLabel(recommendation.track);
     if (profile.likedTrackIds.includes(recommendation.track.id)) {
       await toggleLike(recommendation.track.id, label);
       return;
@@ -41,7 +42,7 @@ export default function Home() {
   }
 
   async function handleDislike(recommendation: Recommendation) {
-    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
+    const label = trackLabel(recommendation.track);
     const wasDisliked = profile.dislikedTrackIds.includes(recommendation.track.id);
     await toggleDislike(recommendation.track.id, label);
     if (!wasDisliked) {

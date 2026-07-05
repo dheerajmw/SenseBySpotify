@@ -4,7 +4,7 @@ import { usePlayer } from "../contexts/PlayerContext";
 import { useSession } from "../hooks/useSession";
 import { getActiveIntent } from "../utils/sessionLifecycle";
 import { formatDuration } from "../utils/music";
-import { trackLabel } from "../utils/track";
+import { trackArtistLine, trackLabel } from "../utils/track";
 
 export default function NowPlaying() {
   const { session } = useSession();
@@ -43,7 +43,7 @@ export default function NowPlaying() {
     );
   }
 
-  const artistNames = currentTrack.artists.map((artist) => artist.name).join(", ");
+  const artistLine = trackArtistLine(currentTrack);
   const hasNext = queueIndex < queue.length - 1;
   const hasPrev = queueIndex > 0;
 
@@ -97,7 +97,7 @@ export default function NowPlaying() {
 
           <div className="min-w-0 flex-1 text-center sm:text-left">
             <h2 className="break-words text-2xl font-semibold sm:text-3xl">{currentTrack.name}</h2>
-            <p className="mt-2 break-words text-base text-zinc-400 sm:text-lg">{artistNames}</p>
+            <p className="mt-2 break-words text-base text-zinc-400 sm:text-lg">{artistLine}</p>
             <p className="mt-1 text-sm text-zinc-500">{currentTrack.album?.name}</p>
 
             <div className="mt-6 flex items-center justify-center gap-4 sm:justify-start">

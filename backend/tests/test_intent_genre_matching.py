@@ -20,9 +20,17 @@ def _track(name: str, genre: Optional[str]) -> Track:
 
 
 def test_resolve_target_genres_for_hindi_poetry() -> None:
-    genres = resolve_target_genres("hindi poetry", ["Bollywood"])
-    assert "Bollywood" in genres
-    assert any("indian" in genre.lower() for genre in genres)
+    genres = resolve_target_genres("Melancholic hindi urdu poetry", ["Rock"], preferred_genres=["Hindi", "Urdu"])
+    assert "Bollywood" in genres or "Indian Pop" in genres
+    assert "Rock" not in genres
+    assert "Indie Rock" not in genres
+    assert "Classical" not in genres
+
+
+def test_resolve_target_genres_for_poetry_without_cultural_cue() -> None:
+    genres = resolve_target_genres("Reading poetry", ["Pop"])
+    assert "Indian Pop" not in genres
+    assert any(genre in {"Singer/Songwriter", "Folk", "Spoken Word"} for genre in genres)
 
 
 def test_resolve_target_genres_for_workout() -> None:
@@ -43,9 +51,14 @@ def test_resolve_target_genres_for_reading_with_hindi_urdu_preferences() -> None
 
 
 def test_build_genre_first_search_queries_avoids_raw_intent_title() -> None:
-    queries = build_genre_first_search_queries("hindi poetry", ["Bollywood"], [])
+    queries = build_genre_first_search_queries(
+        "Melancholic hindi urdu poetry",
+        ["Rock"],
+        [],
+        preferred_genres=["Hindi", "Urdu"],
+    )
     assert "hindi poetry" not in queries
-    assert any("Bollywood" in query for query in queries)
+    assert any("Bollywood" in query or "ghazal" in query for query in queries)
 
 
 def test_score_track_genre_fit_prefers_genre_over_title() -> None:

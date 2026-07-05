@@ -15,6 +15,7 @@ import { useSession } from "../hooks/useSession";
 import { buildRecommendationRequest } from "../utils/recommendationContext";
 import { getActiveIntent } from "../utils/sessionLifecycle";
 import type { FeedbackChip, Recommendation } from "../types";
+import { trackLabel } from "../utils/track";
 
 export default function RecommendationFeed() {
   const { profile } = useProfile();
@@ -84,7 +85,7 @@ export default function RecommendationFeed() {
   }, [isRegeneratingFeed, refreshing, recommendations, gridPhase]);
 
   async function handleLike(recommendation: Recommendation) {
-    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
+    const label = trackLabel(recommendation.track);
     if (profile.likedTrackIds.includes(recommendation.track.id)) {
       await toggleLike(recommendation.track.id, label);
       return;
@@ -93,7 +94,7 @@ export default function RecommendationFeed() {
   }
 
   async function handleDislike(recommendation: Recommendation) {
-    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
+    const label = trackLabel(recommendation.track);
     const wasDisliked = profile.dislikedTrackIds.includes(recommendation.track.id);
     await toggleDislike(recommendation.track.id, label);
     if (!wasDisliked) {
@@ -105,7 +106,7 @@ export default function RecommendationFeed() {
     if (!pendingLike) {
       return;
     }
-    const label = `${pendingLike.track.name} — ${pendingLike.track.artists.map((a) => a.name).join(", ")}`;
+    const label = trackLabel(pendingLike.track);
     await sendFeedback({
       track_id: pendingLike.track.id,
       event_type: "like",
@@ -118,7 +119,7 @@ export default function RecommendationFeed() {
     if (!pendingLike) {
       return;
     }
-    const label = `${pendingLike.track.name} — ${pendingLike.track.artists.map((a) => a.name).join(", ")}`;
+    const label = trackLabel(pendingLike.track);
     await sendFeedback(
       {
         track_id: pendingLike.track.id,

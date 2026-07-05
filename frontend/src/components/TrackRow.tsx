@@ -1,7 +1,7 @@
 import { usePlayer } from "../contexts/PlayerContext";
 import type { QueueSource, Track } from "../types";
 import { formatDuration } from "../utils/music";
-import { trackLabel } from "../utils/track";
+import { trackAccessibleLabel, trackArtistLine, trackLabel } from "../utils/track";
 
 interface TrackRowProps {
   track: Track;
@@ -39,7 +39,7 @@ export default function TrackRow({
 }: TrackRowProps) {
   const { playTrack, isTrackPlaying, togglePlay, currentTrack } = usePlayer();
   const playing = isTrackPlaying(track.id);
-  const artistNames = track.artists.map((artist) => artist.name).join(", ");
+  const artistLine = trackArtistLine(track);
 
   function handlePlay() {
     if (playing) {
@@ -72,7 +72,7 @@ export default function TrackRow({
         <button
           type="button"
           onClick={handlePlay}
-          aria-label={playing ? `Pause ${track.name}` : `Play ${track.name}`}
+          aria-label={playing ? `Pause ${trackAccessibleLabel(track)}` : `Play ${trackAccessibleLabel(track)}`}
           className={[
             "flex h-8 w-8 items-center justify-center rounded-full text-black transition",
             showIndex && typeof index === "number" ? "hidden group-hover:flex" : "flex",
@@ -95,7 +95,7 @@ export default function TrackRow({
 
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-white">{track.name}</p>
-        <p className="truncate text-sm text-zinc-400">{artistNames}</p>
+        <p className="truncate text-sm text-zinc-400">{artistLine}</p>
       </div>
 
       <span className="shrink-0 text-sm text-zinc-500">

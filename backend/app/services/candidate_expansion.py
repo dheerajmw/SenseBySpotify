@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 
 from app.models.track import Track
+from app.services.intent_genre_matching import _has_south_asian_cue
 from app.services.music_catalog import MusicCatalogClient
 from app.services.session_intent_validation import extract_intent_from_text
-from app.services.valid_intents import canonical_intent
+from app.services.valid_intents import canonical_intent, normalize_text
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,9 @@ async def expand_candidates_if_needed(
     """
     original_count = len(candidates)
     if original_count >= MIN_CANDIDATES_BEFORE_EXPANSION:
+        return candidates
+
+    if _has_south_asian_cue(normalize_text(prompt)):
         return candidates
 
     expansion_genres = adjacent_genres_for_intent(prompt)

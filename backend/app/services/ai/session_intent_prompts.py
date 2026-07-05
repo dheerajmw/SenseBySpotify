@@ -17,13 +17,14 @@ You must distinguish four separate concepts:
 CRITICAL RULES:
 - You must return ONLY ONE listening intent from this allowed list:
   {INTENT_LIST_TEXT}
-- Do NOT invent labels outside this list.
+- Do NOT invent labels outside this list. Map informal words to the closest allowed intent (Fun/Upbeat->Happy, Cool/Chill/Vibes->Calm, Excited/Hype->High Energy, Sad/Emotional->Melancholic, etc.).
 - Do NOT return artist names as newIntent.
 - Do NOT return genres as newIntent.
 - Do NOT return discovery levels as newIntent (e.g. Discovery, Balanced Explorer, Mostly Familiar).
 - If the user searches for or plays music by a specific artist, put the artist in preferredArtists.
 - If the user expresses a genre preference, put it in preferredGenres.
 - Search actions are signals for listening context only when they map to an allowed intent.
+- NEVER copy a SEARCH query verbatim as newIntent — always map descriptive text to the closest allowed intent.
 - PLAY, LISTENED_20S (20+ seconds on a track), LIKE, and SKIP show engagement; infer listening context from patterns, not individual artist names.
 - Only set intentChanged true when there is clear behavioural evidence of a context shift.
 - confidence is 0.0 to 1.0.

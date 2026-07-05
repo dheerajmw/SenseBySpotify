@@ -30,6 +30,119 @@ const VALID_INTENT_LOOKUP = new Map(
   VALID_INTENTS.map((intent) => [intent.toLowerCase(), intent]),
 );
 
+const INTENT_ALIASES: Record<string, ValidIntent> = {
+  fun: "Happy",
+  upbeat: "Happy",
+  joyful: "Happy",
+  cheerful: "Happy",
+  playful: "Happy",
+  uplifting: "Happy",
+  good: "Happy",
+  great: "Happy",
+  awesome: "Happy",
+  amazing: "Happy",
+  positive: "Happy",
+  sunny: "Happy",
+  bright: "Happy",
+  "feel good": "Happy",
+  cool: "Calm",
+  chill: "Calm",
+  chilled: "Calm",
+  chillout: "Calm",
+  mellow: "Calm",
+  smooth: "Calm",
+  relaxed: "Relaxing",
+  relaxing: "Relaxing",
+  peaceful: "Calm",
+  cozy: "Calm",
+  cosy: "Calm",
+  "laid back": "Calm",
+  "laid-back": "Calm",
+  easygoing: "Calm",
+  "easy going": "Calm",
+  vibe: "Calm",
+  vibey: "Calm",
+  vibes: "Calm",
+  casual: "Calm",
+  soft: "Calm",
+  gentle: "Calm",
+  tranquil: "Calm",
+  serene: "Calm",
+  lazy: "Relaxing",
+  excited: "High Energy",
+  energizing: "High Energy",
+  energetic: "High Energy",
+  hype: "High Energy",
+  hyped: "High Energy",
+  pumped: "High Energy",
+  intense: "High Energy",
+  powerful: "High Energy",
+  wild: "High Energy",
+  lit: "High Energy",
+  banger: "High Energy",
+  partying: "Party",
+  dance: "Party",
+  dancing: "Party",
+  club: "Party",
+  clubbing: "Party",
+  nightclub: "Party",
+  sad: "Melancholic",
+  emotional: "Melancholic",
+  moody: "Melancholic",
+  blue: "Melancholic",
+  somber: "Melancholic",
+  sombre: "Melancholic",
+  gloomy: "Melancholic",
+  nostalgic: "Melancholic",
+  heartbreak: "Melancholic",
+  heartbroken: "Melancholic",
+  melancholy: "Melancholic",
+  depressing: "Melancholic",
+  dark: "Late Night",
+  sexy: "Romantic",
+  sensual: "Romantic",
+  intimate: "Romantic",
+  love: "Romantic",
+  loving: "Romantic",
+  "date night": "Romantic",
+  productive: "Focus",
+  concentration: "Focus",
+  "deep work": "Focus",
+  "deep-work": "Focus",
+  work: "Focus",
+  working: "Focus",
+  sleepy: "Sleep",
+  drowsy: "Sleep",
+  bedtime: "Sleep",
+  nap: "Sleep",
+  napping: "Sleep",
+  zen: "Meditation",
+  mindful: "Meditation",
+  mindfulness: "Meditation",
+  yoga: "Meditation",
+  exercise: "Workout",
+  fitness: "Workout",
+  training: "Workout",
+  gym: "Workout",
+  commute: "Driving",
+  commuting: "Driving",
+  roadtrip: "Road Trip",
+  nighttime: "Late Night",
+  "night time": "Late Night",
+  "after hours": "Late Night",
+  sunrise: "Morning",
+  "wake up": "Morning",
+  "rainy day": "Rainy Evening",
+  concert: "Festival",
+  concerts: "Festival",
+  rave: "Festival",
+  programming: "Coding",
+  developer: "Coding",
+  dev: "Coding",
+  books: "Reading",
+  book: "Reading",
+};
+
 const GENRE_LABELS = new Set(
   [
     "pop",
@@ -119,6 +232,8 @@ const MOOD_KEYWORD_TO_INTENT: Record<string, ValidIntent> = {
   energy: "High Energy",
   energetic: "High Energy",
   happy: "Happy",
+  fun: "Happy",
+  soft: "Calm",
   sad: "Melancholic",
   melanchol: "Melancholic",
   meditat: "Meditation",
@@ -133,6 +248,74 @@ const MOOD_KEYWORD_TO_INTENT: Record<string, ValidIntent> = {
   urdu: "Melancholic",
   sufi: "Meditation",
 };
+
+const DESCRIPTIVE_PHRASE_TO_INTENT: Array<[string, ValidIntent]> = [
+  ["high notes", "Romantic"],
+  ["high note", "Romantic"],
+  ["powerful vocal", "Romantic"],
+  ["powerful vocals", "Romantic"],
+  ["vocal range", "Romantic"],
+  ["falsetto", "Romantic"],
+  ["slow song", "Relaxing"],
+  ["slow songs", "Relaxing"],
+  ["wind down", "Relaxing"],
+  ["pump up", "High Energy"],
+  ["pump me up", "High Energy"],
+  ["get hyped", "High Energy"],
+  ["road trip", "Road Trip"],
+  ["rainy day", "Rainy Evening"],
+  ["deep work", "Focus"],
+  ["heart break", "Melancholic"],
+  ["heartbreak", "Melancholic"],
+  ["break up", "Melancholic"],
+  ["breakup", "Melancholic"],
+  ["to code", "Coding"],
+  ["while coding", "Coding"],
+  ["to study", "Study"],
+  ["while studying", "Study"],
+  ["to workout", "Workout"],
+  ["while working out", "Workout"],
+  ["to sleep", "Sleep"],
+  ["fall asleep", "Sleep"],
+  ["to drive", "Driving"],
+  ["while driving", "Driving"],
+  ["fun time", "Happy"],
+  ["good time", "Happy"],
+  ["soft song", "Calm"],
+  ["soft songs", "Calm"],
+  ["soft music", "Calm"],
+  ["easy listening", "Relaxing"],
+];
+
+const UPBEAT_INTENTS = new Set<ValidIntent>([
+  "Happy",
+  "Party",
+  "High Energy",
+  "Festival",
+  "Workout",
+]);
+
+function pickBestIntentMatch(matches: ValidIntent[]): ValidIntent | null {
+  if (matches.length === 0) {
+    return null;
+  }
+  const upbeat = matches.find((intent) => UPBEAT_INTENTS.has(intent));
+  return upbeat ?? matches[0];
+}
+
+export function inferIntentFromDescriptivePhrase(text: string): ValidIntent | null {
+  const normalized = text.toLowerCase();
+  const matches: ValidIntent[] = [];
+  const sorted = [...DESCRIPTIVE_PHRASE_TO_INTENT].sort(
+    (left, right) => right[0].length - left[0].length,
+  );
+  for (const [phrase, intent] of sorted) {
+    if (normalized.includes(phrase)) {
+      matches.push(intent);
+    }
+  }
+  return pickBestIntentMatch(matches);
+}
 
 export interface IntentValidationResult {
   accepted: boolean;
@@ -150,7 +333,10 @@ function normalize(value: string): string {
 export function canonicalIntent(value: string): ValidIntent | null {
   const normalized = normalize(value);
   const direct = VALID_INTENT_LOOKUP.get(normalized);
-  return direct ?? null;
+  if (direct) {
+    return direct;
+  }
+  return INTENT_ALIASES[normalized] ?? null;
 }
 
 export function isValidIntent(value: string): boolean {
@@ -178,6 +364,11 @@ export function extractIntentFromText(text: string): ValidIntent | null {
   const direct = canonicalIntent(text);
   if (direct) {
     return direct;
+  }
+
+  const descriptive = inferIntentFromDescriptivePhrase(text);
+  if (descriptive) {
+    return descriptive;
   }
 
   const sorted = Object.entries(MOOD_KEYWORD_TO_INTENT).sort(

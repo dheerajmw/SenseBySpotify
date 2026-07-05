@@ -12,7 +12,7 @@ import {
   formatDuration,
 } from "../utils/music";
 import { buildRecommendationFitBullets } from "../utils/sessionDisplay";
-import { trackLabel } from "../utils/track";
+import { trackAccessibleLabel, trackArtistLine, trackLabel } from "../utils/track";
 
 interface RecommendationCardProps {
   recommendation: Recommendation;
@@ -65,7 +65,7 @@ export default function RecommendationCard({
   const { playTrack, isTrackPlaying, togglePlay, currentTrack } = usePlayer();
   const [showWhy, setShowWhy] = useState(false);
   const { track, rank, confidence } = recommendation;
-  const artistNames = track.artists.map((artist) => artist.name).join(", ");
+  const artistLine = trackArtistLine(track);
   const sessionIntent = getActiveIntent(session);
   const fitBullets = buildRecommendationFitBullets(
     recommendation,
@@ -112,7 +112,7 @@ export default function RecommendationCard({
             type="button"
             onClick={handlePlay}
             disabled={!canPlay}
-            aria-label={playing ? `Pause ${track.name}` : `Preview ${track.name}`}
+            aria-label={playing ? `Pause ${trackAccessibleLabel(track)}` : `Preview ${trackAccessibleLabel(track)}`}
             className={[
               "absolute inset-0 flex items-center justify-center rounded-xl transition",
               canPlay
@@ -150,7 +150,7 @@ export default function RecommendationCard({
           >
             {track.name}
           </h3>
-          <p className="truncate text-sm text-zinc-400">{artistNames}</p>
+          <p className="truncate text-sm text-zinc-400">{artistLine}</p>
 
           <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <button

@@ -1,6 +1,7 @@
 import type { LocalUserProfile, Recommendation, SessionAction } from "../types";
 import { getDiscoveryProfile, normalizeNoveltyTolerance } from "./discoveryLevel";
 import { INTENT_CONFIDENCE_THRESHOLD } from "./intentEvidence";
+import { resolveTrackGenre } from "./track";
 import { parseReasonBullets } from "./music";
 
 export function formatRelativeTime(iso: string): string {
@@ -80,6 +81,9 @@ export function buildRecommendationFitBullets(
   const bullets: string[] = [];
   const reasonParts = parseReasonBullets(recommendation.reason);
   const artistNames = recommendation.track.artists.map((artist) => artist.name);
+  const genre = resolveTrackGenre(recommendation.track);
+
+  bullets.push(`${recommendation.track.name} · ${genre}`);
 
   if (sessionIntent) {
     bullets.push(`Matches your current ${sessionIntent.toLowerCase()} session`);

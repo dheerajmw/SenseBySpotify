@@ -10,7 +10,7 @@ import { useSession } from "../hooks/useSession";
 import { buildRecommendationRequest } from "../utils/recommendationContext";
 import type { FeedbackChip } from "../types";
 import { formatConfidence, formatDuration, parseReasonBullets } from "../utils/music";
-import { trackLabel } from "../utils/track";
+import { resolveTrackGenre, trackArtistLine, trackLabel } from "../utils/track";
 
 export default function RecommendationDetails() {
   const { id } = useParams();
@@ -43,7 +43,7 @@ export default function RecommendationDetails() {
     if (!recommendation) {
       return;
     }
-    const label = `${recommendation.track.name} — ${recommendation.track.artists.map((a) => a.name).join(", ")}`;
+    const label = trackLabel(recommendation.track);
     logAction("RECOMMENDATION_CLICKED", label);
   }, [recommendation?.track.id, logAction, recommendation]);
 
@@ -68,6 +68,7 @@ export default function RecommendationDetails() {
   const { track, reason, confidence, rank } = recommendation;
   const bullets = parseReasonBullets(reason);
   const label = trackLabel(track);
+  const artistLine = trackArtistLine(track);
   const isLiked = profile.likedTrackIds.includes(track.id);
   const isDisliked = profile.dislikedTrackIds.includes(track.id);
 
@@ -157,11 +158,13 @@ export default function RecommendationDetails() {
             </div>
 
             <h1 className="mt-4 text-3xl font-semibold">{track.name}</h1>
-            <p className="mt-2 text-lg text-zinc-400">
-              {track.artists.map((artist) => artist.name).join(", ")}
-            </p>
+            <p className="mt-2 text-lg text-zinc-400">{artistLine}</p>
 
             <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
+              <div className="rounded-lg bg-zinc-950 px-4 py-3">
+                <dt className="text-zinc-500">Genre</dt>
+                <dd className="mt-1 font-medium">{resolveTrackGenre(track)}</dd>
+              </div>
               <div className="rounded-lg bg-zinc-950 px-4 py-3">
                 <dt className="text-zinc-500">Album</dt>
                 <dd className="mt-1 font-medium">{track.album?.name ?? "—"}</dd>

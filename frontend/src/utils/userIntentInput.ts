@@ -2,6 +2,7 @@ import { GENERAL_LISTENING_INTENT } from "../constants/brand";
 import { inferIntentFromSearchQuery } from "./trackIntentFit";
 import {
   extractIntentFromText,
+  inferIntentFromDescriptivePhrase,
   isKnownArtist,
   validateProposedIntent,
 } from "./intentValidation";
@@ -176,7 +177,9 @@ export function resolveUserDeclaredIntent(
 
   if (!validation.accepted) {
     const inferred =
-      inferIntentFromSearchQuery(cleaned, profileGenres) ?? extractIntentFromText(cleaned);
+      inferIntentFromDescriptivePhrase(cleaned) ??
+      inferIntentFromSearchQuery(cleaned, profileGenres) ??
+      extractIntentFromText(cleaned);
     if (inferred) {
       validation = {
         accepted: true,
@@ -214,12 +217,42 @@ export function resolveUserDeclaredIntent(
 
   const intent = refineIntentForCulturalListening(cleaned, validation.intent);
 
+  const finalPreferredGenres = [...preferredGenres];
+  const finalSeen = new Set(finalPreferredGenres.map(normalize));
+  const normalized = normalize(cleaned);
+  if (/highnotes?|powerfulvocal|vocalrange|falsetto/.test(normalized.replace(/\s+/g, ""))) {
+    for (const genre of ["Pop", "Vocal", "R&B/Soul"]) {
+      if (!finalSeen.has(normalize(genre))) {
+        finalPreferredGenres.push(genre);
+        finalSeen.add(normalize(genre));
+      }
+    }
+  }
+
+  if (/softsong|softmusic|easylistening/.test(normalized.replace(/\s+/g, ""))) {
+    for (const genre of ["Easy Listening", "Acoustic", "Singer/Songwriter"]) {
+      if (!finalSeen.has(normalize(genre))) {
+        finalPreferredGenres.push(genre);
+        finalSeen.add(normalize(genre));
+      }
+    }
+  }
+
+  if (/poetry|poem|ghazal|shayari|nazm/.test(normalized)) {
+    const poetryGenre = /hindi|urdu|bollywood|ghazal|shayari|punjabi|sufi/.test(normalized)
+      ? "Ghazal"
+      : "Poetry";
+    if (!finalSeen.has(normalize(poetryGenre))) {
+      finalPreferredGenres.push(poetryGenre);
+    }
+  }
+
   return {
     accepted: true,
     intent,
-    preferredGenres,
+    preferredGenres: finalPreferredGenres,
     preferredArtists: validation.preferredArtists,
-    displayLabel: formatResolvedIntentLabel(intent, preferredGenres),
+    displayLabel: formatResolvedIntentLabel(intent, finalPreferredGenres),
     rejectionReason: null,
   };
 }

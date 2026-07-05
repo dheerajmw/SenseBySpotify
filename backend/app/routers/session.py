@@ -5,12 +5,15 @@ from fastapi import APIRouter, Depends
 from app.config import Settings, get_settings
 from app.exceptions import AppError
 from app.schemas.session_intent import (
+    ParseUserIntentRequest,
+    ParseUserIntentResponse,
     UpdateSessionIntentRequest,
     UpdateSessionIntentResponse,
 )
 from app.services.ai.openai_provider import OpenAIProvider
 from app.services.session_intent_rules import infer_intent_from_actions, merge_intent_results
 from app.services.session_intent_validation import sanitize_session_intent_result
+from app.services.user_intent_parser import parse_user_declared_intent
 
 router = APIRouter(tags=["session"])
 
@@ -102,4 +105,28 @@ async def update_session_intent(
         validation_status=sanitized.get("validation_status", "accepted"),
         validation_message=sanitized.get("validation_message"),
         raw_new_intent=sanitized.get("raw_new_intent"),
+    )
+
+
+@router.post("/parse-user-intent", response_model=ParseUserIntentResponse)
+async def parse_user_intent(
+    payload: ParseUserIntentRequest,
+    ai_provider: OpenAIProvider = Depends(get_ai_provider),
+) -> ParseUserIntentResponse:
+    profile_artists = [artist.name for artist in payload.profile.favourite_artists]
+    result = await parse_user_declared_intent(
+        payload.user_input,
+        profile_artists=profile_artists,
+        profile_genres=payload.profile.genres,
+        ai_provider=ai_provider,
+    )
+    return ParseUserIntentResponse(
+        accepted=result["accepted"],
+        intent=result["intent"],
+        preferred_artists=result["preferred_artists"],
+        preferred_genres=result["preferred_genres"],
+        display_label=result.get("display_label", ""),
+        reason=result.get("reason", ""),
+        rejection_reason=result.get("rejection_reason"),
+        source=result.get("source", "rules"),
     )
