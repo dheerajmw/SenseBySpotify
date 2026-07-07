@@ -27,13 +27,16 @@ export const DISCOVERY_STYLE_OPTIONS = [
 ] as const;
 
 export const INTENT_CHIPS = [
+  "Focus",
   "Workout",
-  "Study",
+  "Relaxing",
   "Party",
   "Driving",
-  "Sleep",
-  "Focus",
-  "Travel",
+  "Happy",
+  "Melancholic",
+  "Romantic",
+  "Morning",
+  "Late Night",
 ] as const;
 
 export const PROFILE_STORAGE_KEY = "sense_profile";

@@ -127,12 +127,12 @@ def test_validate_proposed_intent_maps_fun_alias_to_happy():
 @pytest.mark.parametrize(
     ("raw_intent", "expected"),
     [
-        ("COOL", "Calm"),
-        ("Chill", "Calm"),
-        ("Vibes", "Calm"),
-        ("Hype", "High Energy"),
+        ("COOL", "Relaxing"),
+        ("Chill", "Relaxing"),
+        ("Vibes", "Relaxing"),
+        ("Hype", "Party"),
         ("Emotional", "Melancholic"),
-        ("Zen", "Meditation"),
+        ("Zen", "Relaxing"),
         ("Gym", "Workout"),
         ("Date Night", "Romantic"),
     ],
@@ -150,6 +150,11 @@ def test_validate_proposed_intent_maps_common_aliases(raw_intent: str, expected:
 
 def test_extract_intent_from_descriptive_high_notes():
     assert extract_intent_from_text("SONG WITH HIGH NOTES") == "Romantic"
+
+
+def test_study_alias_maps_to_focus():
+    assert extract_intent_from_text("study music") == "Focus"
+    assert extract_intent_from_text("CALM") == "Relaxing"
 
 
 def test_sanitize_accepts_fun_ai_intent_as_happy():

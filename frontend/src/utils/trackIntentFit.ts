@@ -38,27 +38,16 @@ const INTENT_KEYWORD_TO_GENRES: Record<string, string[]> = {
 };
 
 const MOOD_INTENT_TO_GENRES: Record<string, string[]> = {
+  Focus: ["Classical", "Electronic", "Easy Listening", "Ambient", "Indie Rock"],
   Workout: ["Pop", "Hip-Hop/Rap", "Dance", "Electronic"],
-  Study: ["Classical", "Easy Listening", "Ambient", "Electronic"],
-  Focus: ["Classical", "Electronic", "Easy Listening", "Ambient"],
-  Coding: ["Electronic", "Ambient", "Easy Listening", "Indie Rock"],
-  Driving: ["Rock", "Pop", "Hip-Hop/Rap", "Alternative"],
-  Relaxing: ["Easy Listening", "Singer/Songwriter", "Ambient", "Jazz"],
-  Calm: ["Easy Listening", "Ambient", "Classical", "New Age"],
-  Party: ["Dance", "Pop", "Hip-Hop/Rap", "Electronic"],
-  Travel: ["Pop", "Rock", "Indie Rock", "Alternative"],
-  Sleep: ["Ambient", "Easy Listening", "New Age", "Classical"],
-  Romantic: ["Pop", "R&B/Soul", "Singer/Songwriter", "Soft Rock"],
-  Morning: ["Pop", "Indie Rock", "Singer/Songwriter", "Folk"],
-  "Late Night": ["R&B/Soul", "Hip-Hop/Rap", "Electronic", "Jazz"],
-  Meditation: ["New Age", "Ambient", "Classical", "World"],
-  Reading: ["Classical", "Jazz", "Easy Listening", "Ambient"],
-  "Rainy Evening": ["Singer/Songwriter", "Indie Rock", "Jazz", "Alternative"],
-  "Road Trip": ["Rock", "Pop", "Country", "Alternative"],
-  Festival: ["Dance", "Electronic", "Pop", "Rock"],
-  "High Energy": ["Dance", "Electronic", "Hip-Hop/Rap", "Rock", "Pop", "Alternative", "Metal"],
+  Driving: ["Rock", "Pop", "Hip-Hop/Rap", "Alternative", "Country", "Indie Rock"],
+  Relaxing: ["Easy Listening", "Singer/Songwriter", "Ambient", "Jazz", "New Age", "Classical"],
+  Party: ["Dance", "Pop", "Hip-Hop/Rap", "Electronic", "Rock", "Metal"],
   Happy: ["Pop", "Dance", "Folk", "Indie Rock"],
   Melancholic: ["Singer/Songwriter", "Indie Rock", "Alternative", "Folk"],
+  Romantic: ["Pop", "R&B/Soul", "Singer/Songwriter", "Soft Rock"],
+  Morning: ["Pop", "Indie Rock", "Singer/Songwriter", "Folk"],
+  "Late Night": ["R&B/Soul", "Hip-Hop/Rap", "Electronic", "Jazz", "Singer/Songwriter", "Indie Rock"],
 };
 
 /** Minimum genre-fit score for a track to count as supporting the predicted intent. */

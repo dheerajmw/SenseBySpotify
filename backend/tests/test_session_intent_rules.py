@@ -26,11 +26,11 @@ def test_single_search_and_play_does_not_change_intent():
         {"type": "PLAY", "value": "Love Song — Artist", "timestamp": 1},
     ]
 
-    result = infer_intent_from_actions("Study", actions)
+    result = infer_intent_from_actions("Focus", actions)
 
     assert result is not None
     assert result["intent_changed"] is False
-    assert result["new_intent"] == "Study"
+    assert result["new_intent"] == "Focus"
 
 
 def test_no_change_when_search_matches_current_intent():

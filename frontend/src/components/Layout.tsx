@@ -5,6 +5,7 @@ import DemoModeToggle from "./DemoModeToggle";
 import GlobalSearch from "./GlobalSearch";
 import MusicPlayerBar from "./MusicPlayerBar";
 import SessionIntentPrompt from "./SessionIntentPrompt";
+import SessionStatusPill from "./SessionStatusPill";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -16,8 +17,8 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export default function Layout() {
   return (
-    <div className="min-h-screen pb-[7.5rem] sm:pb-28">
-      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
+    <div className="player-bar-offset min-h-screen">
+      <header className="safe-top sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <BrandHeader />
@@ -45,7 +46,8 @@ export default function Layout() {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-8">
+      <SessionStatusPill />
+      <main className="layout-main-with-pill mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-8">
         <Outlet />
       </main>
       <MusicPlayerBar />

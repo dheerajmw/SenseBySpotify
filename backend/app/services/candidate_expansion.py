@@ -18,12 +18,13 @@ ADJACENT_GENRES_BY_INTENT: dict[str, list[str]] = {
     "Romantic": ["Bollywood", "Pop", "Singer/Songwriter"],
     "Workout": ["Dance", "Electronic", "Pop"],
     "Focus": ["Ambient", "Classical", "Easy Listening"],
-    "Coding": ["Hip-Hop/Rap", "Ambient", "Electronic"],
-    "Study": ["Classical", "Easy Listening", "Singer/Songwriter"],
     "Relaxing": ["Singer/Songwriter", "Easy Listening", "Ambient"],
-    "Travel": ["Indie Rock", "Pop", "Alternative"],
+    "Driving": ["Indie Rock", "Pop", "Alternative", "Rock"],
+    "Party": ["Dance", "Electronic", "Pop"],
     "Late Night": ["Soul", "R&B/Soul", "Easy Listening"],
-    "Road Trip": ["Rock", "Pop", "Indie Rock"],
+    "Happy": ["Pop", "Indie Rock", "Folk"],
+    "Melancholic": ["Singer/Songwriter", "Indie Rock", "Alternative"],
+    "Morning": ["Pop", "Indie Rock", "Folk"],
 }
 
 

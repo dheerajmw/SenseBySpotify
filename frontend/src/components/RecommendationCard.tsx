@@ -116,7 +116,7 @@ export default function RecommendationCard({
             className={[
               "absolute inset-0 flex items-center justify-center rounded-xl transition",
               canPlay
-                ? "bg-black/40 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                ? "bg-black/40 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"
                 : "cursor-not-allowed",
               playing ? "opacity-100 bg-black/50" : "",
             ].join(" ")}
@@ -240,7 +240,7 @@ export default function RecommendationCard({
                     <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">
                       <CheckIcon />
                     </span>
-                    <span>{bullet}</span>
+                    <span className="min-w-0 break-words">{bullet}</span>
                   </li>
                 ))}
               </ul>

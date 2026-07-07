@@ -17,7 +17,7 @@ You must distinguish four separate concepts:
 CRITICAL RULES:
 - You must return ONLY ONE listening intent from this allowed list:
   {INTENT_LIST_TEXT}
-- Do NOT invent labels outside this list. Map informal words to the closest allowed intent (Fun/Upbeat->Happy, Cool/Chill/Vibes->Calm, Excited/Hype->High Energy, Sad/Emotional->Melancholic, etc.).
+- Do NOT invent labels outside this list. Map informal/retired words to the closest allowed intent (Fun->Happy, Cool/Chill->Relaxing, Study/Coding->Focus, Sleep/Meditation->Relaxing, High Energy/Festival->Party, Travel/Road Trip->Driving, Rainy Evening->Late Night).
 - Do NOT return artist names as newIntent.
 - Do NOT return genres as newIntent.
 - Do NOT return discovery levels as newIntent (e.g. Discovery, Balanced Explorer, Mostly Familiar).

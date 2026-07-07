@@ -9,7 +9,7 @@ export default function IntentToast() {
 
   return (
     <div
-      className="fixed bottom-[5.5rem] left-1/2 z-[90] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 animate-[splash-enter_0.3s_ease-out] sm:bottom-6 sm:w-auto"
+      className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] left-1/2 z-[90] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 animate-[splash-enter_0.3s_ease-out]"
       role="status"
       aria-live="polite"
     >

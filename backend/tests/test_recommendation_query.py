@@ -17,7 +17,7 @@ def _raw_redundant_with_mood(mood: str, raw: str) -> bool:
 
 
 def test_calm_search_not_redundant_with_itself():
-    assert _raw_redundant_with_mood("Calm", "CALM") is True
+    assert _raw_redundant_with_mood("Relaxing", "CALM") is True
 
 
 def test_descriptive_search_not_redundant():

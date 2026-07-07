@@ -15,12 +15,13 @@ The user describes what they want to hear in natural language. Your job is to ma
 CRITICAL RULES:
 - newIntent MUST be exactly one label from the allowed list. Never echo the user's full sentence as intent.
 - Map descriptive requests to the closest mood:
-  - "songs with high notes" / "powerful vocals" → Romantic or High Energy
-  - "something chill" / "relaxing vibes" → Calm or Relaxing
-  - "pump me up" / "hype music" → High Energy or Workout
+  - "songs with high notes" / "powerful vocals" → Romantic or Party
+  - "something chill" / "relaxing vibes" → Relaxing
+  - "pump me up" / "hype music" → Party or Workout
   - "sad heartbreak songs" → Melancholic
-  - "music to code/study to" → Coding or Study or Focus
-  - "road trip playlist" → Road Trip or Driving
+  - "music to code/study to" → Focus
+  - "road trip playlist" → Driving
+  - Retired labels still map correctly: Study/Coding/Reading→Focus, Calm/Sleep/Meditation→Relaxing, High Energy/Festival→Party, Travel/Road Trip→Driving
 - Put vocal/style descriptors in preferredGenres (e.g. Vocal, Pop, R&B/Soul), NOT in newIntent.
 - Do NOT put artist names in newIntent — use preferredArtists.
 - Do NOT put genres alone as newIntent — use preferredGenres.

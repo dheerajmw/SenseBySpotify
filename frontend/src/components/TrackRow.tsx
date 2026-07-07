@@ -65,17 +65,21 @@ export default function TrackRow({
         currentTrack?.id === track.id ? "bg-emerald-500/10" : "hover:bg-zinc-800/60",
       ].join(" ")}
     >
-      <div className="flex w-8 shrink-0 items-center justify-center text-sm text-zinc-500">
+      <div className="flex w-9 shrink-0 items-center justify-center sm:w-8">
         {showIndex && typeof index === "number" ? (
-          <span className="group-hover:hidden">{index + 1}</span>
+          <span className="hidden text-sm text-zinc-500 sm:group-hover:hidden sm:inline">
+            {index + 1}
+          </span>
         ) : null}
         <button
           type="button"
           onClick={handlePlay}
           aria-label={playing ? `Pause ${trackAccessibleLabel(track)}` : `Play ${trackAccessibleLabel(track)}`}
           className={[
-            "flex h-8 w-8 items-center justify-center rounded-full text-black transition",
-            showIndex && typeof index === "number" ? "hidden group-hover:flex" : "flex",
+            "flex h-9 w-9 items-center justify-center rounded-full text-black transition active:scale-95",
+            showIndex && typeof index === "number"
+              ? "flex sm:hidden sm:group-hover:flex"
+              : "flex",
             playing ? "bg-emerald-400" : "bg-emerald-500 hover:bg-emerald-400",
           ].join(" ")}
         >

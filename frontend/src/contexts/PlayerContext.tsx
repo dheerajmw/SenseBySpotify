@@ -11,6 +11,7 @@ import {
 import { AUTOPLAY_STORAGE_KEY } from "../constants/brand";
 import type { QueueSource, Track } from "../types";
 import { SUSTAINED_LISTEN_MS } from "../utils/intentEvidence";
+import { configurePreviewAudio, isPlaybackBlockedError } from "../utils/audioPlayback";
 import { playbackBridge } from "../utils/playbackBridge";
 import { trackLabel } from "../utils/track";
 import { useSessionContext } from "./SessionContext";
@@ -46,6 +47,8 @@ interface PlayerContextValue {
   setAutoplayEnabled: (enabled: boolean) => void;
   closePlayer: () => void;
   isTrackPlaying: (trackId: string) => boolean;
+  playbackBlocked: boolean;
+  resumePlayback: () => void;
   getQueueSnapshot: () => { queue: Track[]; index: number; queueSource: QueueSource };
 }
 
@@ -89,6 +92,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [recentPlays, setRecentPlays] = useState<Track[]>(loadRecentPlays);
+  const [playbackBlocked, setPlaybackBlocked] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentTrackRef = useRef<Track | null>(null);
@@ -178,7 +182,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       }
 
       const audio = new Audio(track.preview_url);
+      configurePreviewAudio(audio);
       audioRef.current = audio;
+      setPlaybackBlocked(false);
 
       audio.onloadedmetadata = () => {
         setDuration(audio.duration || 30);
@@ -228,10 +234,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
       void audio.play().then(() => {
         setIsPlaying(true);
+        setPlaybackBlocked(false);
         playbackBridge.setPlaying(true);
-      }).catch(() => {
+      }).catch((error) => {
         setIsPlaying(false);
         playbackBridge.setPlaying(false);
+        if (isPlaybackBlockedError(error)) {
+          setPlaybackBlocked(true);
+        }
       });
     },
     [logPlayIfNew, stopAudio],
@@ -275,8 +285,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     [playAtIndex],
   );
 
+  const resumePlayback = useCallback(() => {
+    if (!audioRef.current && currentTrack?.preview_url) {
+      startAudio(currentTrack);
+      return;
+    }
+    if (!audioRef.current) {
+      return;
+    }
+    void audioRef.current.play().then(() => {
+      setIsPlaying(true);
+      setPlaybackBlocked(false);
+      playbackBridge.setPlaying(true);
+    }).catch((error) => {
+      if (isPlaybackBlockedError(error)) {
+        setPlaybackBlocked(true);
+      }
+    });
+  }, [currentTrack, startAudio]);
+
   const togglePlay = useCallback(() => {
     if (!currentTrack) {
+      return;
+    }
+    if (playbackBlocked || (!isPlaying && audioRef.current)) {
+      resumePlayback();
       return;
     }
     if (isPlaying && audioRef.current) {
@@ -288,12 +321,13 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (audioRef.current) {
       void audioRef.current.play().then(() => {
         setIsPlaying(true);
+        setPlaybackBlocked(false);
         playbackBridge.setPlaying(true);
       });
       return;
     }
     startAudio(currentTrack);
-  }, [currentTrack, isPlaying, startAudio]);
+  }, [currentTrack, isPlaying, playbackBlocked, resumePlayback, startAudio]);
 
   const pause = useCallback(() => {
     if (audioRef.current) {
@@ -329,10 +363,14 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       audioRef.current.currentTime = 0;
       void audioRef.current.play().then(() => {
         setIsPlaying(true);
+        setPlaybackBlocked(false);
         playbackBridge.setPlaying(true);
-      }).catch(() => {
+      }).catch((error) => {
         setIsPlaying(false);
         playbackBridge.setPlaying(false);
+        if (isPlaybackBlockedError(error)) {
+          setPlaybackBlocked(true);
+        }
       });
       return;
     }
@@ -389,6 +427,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   const closePlayer = useCallback(() => {
     stopAudio();
+    setPlaybackBlocked(false);
     setCurrentTrack(null);
     setQueue([]);
     setQueueIndex(0);
@@ -441,6 +480,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setAutoplayEnabled,
       closePlayer,
       isTrackPlaying,
+      playbackBlocked,
+      resumePlayback,
       getQueueSnapshot,
     }),
     [
@@ -464,6 +505,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setAutoplayEnabled,
       closePlayer,
       isTrackPlaying,
+      playbackBlocked,
+      resumePlayback,
       getQueueSnapshot,
     ],
   );
