@@ -18,11 +18,11 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 export default function Layout() {
   return (
     <div className="player-bar-offset min-h-screen">
-      <header className="safe-top sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-3 py-3 sm:gap-4 sm:px-4 sm:py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <header className="app-header safe-top sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-4">
+          <div className="flex flex-col gap-2 sm:gap-3 lg:flex-row lg:items-center lg:justify-between">
             <BrandHeader />
-            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end lg:w-auto lg:gap-3">
+            <div className="flex w-full min-w-0 items-center gap-2 sm:justify-end lg:w-auto lg:gap-3">
               <GlobalSearch />
               <DemoModeToggle />
             </div>
@@ -44,10 +44,10 @@ export default function Layout() {
               Now Playing
             </NavLink>
           </nav>
+          <SessionStatusPill />
         </div>
       </header>
-      <SessionStatusPill />
-      <main className="layout-main-with-pill mx-auto max-w-6xl px-3 py-5 sm:px-4 sm:py-8">
+      <main className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-8">
         <Outlet />
       </main>
       <MusicPlayerBar />

@@ -17,7 +17,7 @@ export default function AiFallbackBanner() {
 
   return (
     <div
-      className="pointer-events-auto fixed left-3 right-3 top-[4.5rem] z-[84] mx-auto max-w-lg sm:left-4 sm:right-4 sm:top-24"
+      className="pointer-events-auto fixed inset-x-3 z-[84] mx-auto max-w-lg overlay-above-player sm:inset-x-4 sm:bottom-auto sm:top-24"
       role="status"
       aria-live="polite"
     >

@@ -236,28 +236,49 @@ body {
   display: none;
 }
 
-/* iOS safe areas for fixed header/player */
+/* iOS safe areas + shared overlay offsets */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --player-offset: calc(8.25rem + var(--safe-bottom));
+  --overlay-bottom: calc(var(--player-offset) + 0.75rem);
+}
+
 .safe-top {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: var(--safe-top);
 }
 
 .safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--safe-bottom);
 }
 
 .player-bar-offset {
-  padding-bottom: calc(7.75rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: var(--player-offset);
 }
 
 @media (min-width: 640px) {
-  .player-bar-offset {
-    padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+  :root {
+    --player-offset: calc(7.5rem + var(--safe-bottom));
+    --overlay-bottom: calc(var(--player-offset) + 1rem);
   }
 }
 
-/* Session pill clears sticky header on mobile */
-@media (max-width: 639px) {
-  .layout-main-with-pill {
-    padding-top: 2.25rem;
+.overlay-above-player {
+  bottom: var(--overlay-bottom);
+}
+
+@media (min-width: 640px) {
+  .overlay-above-player {
+    bottom: auto;
+  }
+}
+
+.overlay-below-header {
+  top: calc(var(--safe-top) + 12.5rem);
+}
+
+@media (min-width: 640px) {
+  .overlay-below-header {
+    top: 6rem;
   }
 }

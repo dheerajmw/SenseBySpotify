@@ -124,7 +124,7 @@ export default function SessionDebugger() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed right-3 top-[7.5rem] z-[75] max-w-[9rem] rounded-full border border-emerald-500/40 bg-zinc-950/90 px-3 py-2 text-xs font-medium text-emerald-300 shadow-lg backdrop-blur hover:bg-zinc-900 sm:right-4 sm:top-20 sm:max-w-[11rem] sm:px-4"
+        className="overlay-above-player fixed left-3 z-[75] max-w-[8.5rem] rounded-full border border-emerald-500/40 bg-zinc-950/90 px-2.5 py-1.5 text-[11px] font-medium text-emerald-300 shadow-lg backdrop-blur hover:bg-zinc-900 sm:left-auto sm:right-4 sm:bottom-auto sm:top-20 sm:max-w-[11rem] sm:px-4 sm:py-2 sm:text-xs"
       >
         <span className="block truncate">AI Session</span>
         {hasKnownIntent(session.currentIntent) && (
