@@ -54,6 +54,7 @@ export default function MusicPlayerBar() {
     queueIndex,
     autoplayEnabled,
     playbackBlocked,
+    queueAdvancePending,
     resumePlayback,
   } = usePlayer();
 
@@ -64,7 +65,10 @@ export default function MusicPlayerBar() {
   const artistLine = trackArtistLine(currentTrack);
   const hasNext = queueIndex < queue.length - 1 || autoplayEnabled;
   const hasPrev = queueIndex > 0;
-  const showBlockedHint = playbackBlocked && !isPlaying;
+  const showBlockedHint = (playbackBlocked || queueAdvancePending) && !isPlaying;
+  const blockedMessage = queueAdvancePending
+    ? `Next up: ${currentTrack.name} — tap to play`
+    : "Tap to play preview (required on mobile)";
 
   return (
     <div className="safe-bottom fixed bottom-0 left-0 right-0 z-50 border-t border-zinc-800 bg-zinc-950/98 backdrop-blur-md">
@@ -74,7 +78,7 @@ export default function MusicPlayerBar() {
           onClick={resumePlayback}
           className="w-full border-b border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-center text-xs font-medium text-amber-200 active:bg-amber-500/20"
         >
-          Tap to play preview (required on mobile)
+          Tap to play preview — {blockedMessage}
         </button>
       )}
       <div className="mx-auto max-w-6xl px-3 py-2.5 sm:px-4 sm:py-3">

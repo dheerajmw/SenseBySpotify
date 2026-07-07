@@ -58,6 +58,14 @@ export default function AutoplayController() {
         return;
       }
 
+      const snapshot = getQueueSnapshotRef.current();
+      if (
+        snapshot.queueSource === "intent" &&
+        snapshot.index < snapshot.queue.length - 1
+      ) {
+        return;
+      }
+
       handlingRef.current = true;
       void (async () => {
         try {

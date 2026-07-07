@@ -21,6 +21,8 @@ const RECENT_STORAGE_KEY = "sense_recent_plays";
 interface PlayOptions {
   /** Autoplay — defer confidence updates until LISTENED_20S */
   autoplay?: boolean;
+  /** Called from audio.onended — keep play() in the same sync stack for mobile */
+  syncQueueAdvance?: boolean;
 }
 
 interface PlayerContextValue {
@@ -48,6 +50,7 @@ interface PlayerContextValue {
   closePlayer: () => void;
   isTrackPlaying: (trackId: string) => boolean;
   playbackBlocked: boolean;
+  queueAdvancePending: boolean;
   resumePlayback: () => void;
   getQueueSnapshot: () => { queue: Track[]; index: number; queueSource: QueueSource };
 }
@@ -93,6 +96,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [recentPlays, setRecentPlays] = useState<Track[]>(loadRecentPlays);
   const [playbackBlocked, setPlaybackBlocked] = useState(false);
+  const [queueAdvancePending, setQueueAdvancePending] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const currentTrackRef = useRef<Track | null>(null);
@@ -103,6 +107,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const restoredQueueRef = useRef(session.currentQueue.length > 0);
   const logActionRef = useRef(logAction);
   const sustainedListenAwardedTrackIdRef = useRef<string | null>(null);
+  const playAtIndexRef = useRef<
+    (index: number, tracks?: Track[], options?: PlayOptions) => void
+  >(() => {});
 
   logActionRef.current = logAction;
 
@@ -144,25 +151,166 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     [logAction],
   );
 
-  const stopAudio = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current = null;
+  const pauseAudio = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) {
+      return;
     }
+    audio.pause();
     setIsPlaying(false);
     playbackBridge.setPlaying(false);
+  }, []);
+
+  const resetProgress = useCallback(() => {
     setProgress(0);
     setCurrentTime(0);
     setDuration(0);
   }, []);
+
+  const stopAudio = useCallback(() => {
+    pauseAudio();
+    resetProgress();
+    if (audioRef.current) {
+      audioRef.current.removeAttribute("src");
+      audioRef.current.load();
+    }
+  }, [pauseAudio, resetProgress]);
+
+  const beginPlayback = useCallback(
+    (audio: HTMLAudioElement, options?: PlayOptions) => {
+      setPlaybackBlocked(false);
+      setQueueAdvancePending(false);
+
+      void audio.play()
+        .then(() => {
+          setIsPlaying(true);
+          setPlaybackBlocked(false);
+          setQueueAdvancePending(false);
+          playbackBridge.setPlaying(true);
+        })
+        .catch((error) => {
+          setIsPlaying(false);
+          playbackBridge.setPlaying(false);
+          if (isPlaybackBlockedError(error)) {
+            setPlaybackBlocked(true);
+            if (options?.autoplay || options?.syncQueueAdvance) {
+              setQueueAdvancePending(true);
+            }
+          }
+        });
+    },
+    [],
+  );
+
+  const handleTrackEnded = useCallback(() => {
+    const endedTrack = currentTrackRef.current;
+    if (
+      endedTrack &&
+      sustainedListenAwardedTrackIdRef.current === endedTrack.id
+    ) {
+      logActionRef.current("PREVIEW_COMPLETED", trackLabel(endedTrack), {
+        track: endedTrack,
+        queueSource: queueSourceRef.current,
+      });
+    }
+
+    setIsPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+    playbackBridge.setPlaying(false);
+
+    if (
+      autoplayRef.current &&
+      queueIndexRef.current < queueRef.current.length - 1
+    ) {
+      const nextIndex = queueIndexRef.current + 1;
+      playAtIndexRef.current(nextIndex, queueRef.current, {
+        autoplay: true,
+        syncQueueAdvance: true,
+      });
+      return;
+    }
+
+    if (endedTrack) {
+      playbackBridge.setLastEndedTrack(endedTrack);
+    }
+    playbackBridge.notifyTrackEnded();
+  }, []);
+
+  const ensureAudioElement = useCallback((): HTMLAudioElement | null => {
+    if (audioRef.current) {
+      return audioRef.current;
+    }
+    const audio = document.createElement("audio");
+    configurePreviewAudio(audio);
+    audio.className = "sr-only";
+    audio.setAttribute("aria-hidden", "true");
+    document.body.appendChild(audio);
+
+    audio.onloadedmetadata = () => {
+      setDuration(audio.duration || 30);
+    };
+    audio.ontimeupdate = () => {
+      const total = audio.duration || 30;
+      setCurrentTime(audio.currentTime);
+      setProgress(total > 0 ? audio.currentTime / total : 0);
+
+      const track = currentTrackRef.current;
+      if (!track) {
+        return;
+      }
+
+      const listenThresholdSec = SUSTAINED_LISTEN_MS / 1000;
+      if (
+        audio.currentTime >= listenThresholdSec &&
+        sustainedListenAwardedTrackIdRef.current !== track.id
+      ) {
+        sustainedListenAwardedTrackIdRef.current = track.id;
+        logActionRef.current("LISTENED_20S", trackLabel(track), {
+          track,
+          queueSource: queueSourceRef.current,
+        });
+      }
+    };
+    audio.onended = () => {
+      handleTrackEnded();
+    };
+    audio.onerror = () => {
+      setIsPlaying(false);
+      playbackBridge.setPlaying(false);
+      if (currentTrackRef.current) {
+        playbackBridge.setLastEndedTrack(currentTrackRef.current);
+      }
+      playbackBridge.notifyTrackEnded();
+    };
+
+    audioRef.current = audio;
+    return audio;
+  }, [handleTrackEnded]);
+
+  useEffect(() => {
+    ensureAudioElement();
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.remove();
+        audioRef.current = null;
+      }
+    };
+  }, [ensureAudioElement]);
 
   const playAtIndex = useCallback(
     (index: number, tracks: Track[] = queueRef.current, options?: PlayOptions) => {
       if (index < 0 || index >= tracks.length) {
         return;
       }
+
       const track = tracks[index];
+      const audio = ensureAudioElement();
+      if (!audio) {
+        return;
+      }
+
       sustainedListenAwardedTrackIdRef.current = null;
       logPlayIfNew(track, options);
       setQueue(tracks);
@@ -172,8 +320,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setCurrentTrack(track);
       setRecentPlays((current) => persistRecent(track, current));
 
-      stopAudio();
       if (!track.preview_url) {
+        audio.pause();
+        audio.removeAttribute("src");
         if (track.external_url) {
           window.open(track.external_url, "_blank", "noopener,noreferrer");
         }
@@ -181,78 +330,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const audio = new Audio(track.preview_url);
-      configurePreviewAudio(audio);
-      audioRef.current = audio;
-      setPlaybackBlocked(false);
+      if (!options?.syncQueueAdvance) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
 
-      audio.onloadedmetadata = () => {
-        setDuration(audio.duration || 30);
-      };
-      audio.ontimeupdate = () => {
-        const total = audio.duration || 30;
-        setCurrentTime(audio.currentTime);
-        setProgress(total > 0 ? audio.currentTime / total : 0);
-
-        const listenThresholdSec = SUSTAINED_LISTEN_MS / 1000;
-        if (
-          audio.currentTime >= listenThresholdSec &&
-          sustainedListenAwardedTrackIdRef.current !== track.id
-        ) {
-          sustainedListenAwardedTrackIdRef.current = track.id;
-          logActionRef.current("LISTENED_20S", trackLabel(track), {
-            track,
-            queueSource: queueSourceRef.current,
-          });
-        }
-      };
-      audio.onended = () => {
-        if (
-          currentTrackRef.current &&
-          sustainedListenAwardedTrackIdRef.current === currentTrackRef.current.id
-        ) {
-          logActionRef.current("PREVIEW_COMPLETED", trackLabel(currentTrackRef.current), {
-            track: currentTrackRef.current,
-            queueSource: queueSourceRef.current,
-          });
-        }
-        setIsPlaying(false);
-        setProgress(0);
-        setCurrentTime(0);
-        if (currentTrackRef.current) {
-          playbackBridge.setLastEndedTrack(currentTrackRef.current);
-        }
-        playbackBridge.notifyTrackEnded();
-      };
-      audio.onerror = () => {
-        setIsPlaying(false);
-        if (currentTrackRef.current) {
-          playbackBridge.setLastEndedTrack(currentTrackRef.current);
-        }
-        playbackBridge.notifyTrackEnded();
-      };
-
-      void audio.play().then(() => {
-        setIsPlaying(true);
-        setPlaybackBlocked(false);
-        playbackBridge.setPlaying(true);
-      }).catch((error) => {
-        setIsPlaying(false);
-        playbackBridge.setPlaying(false);
-        if (isPlaybackBlockedError(error)) {
-          setPlaybackBlocked(true);
-        }
-      });
+      audio.src = track.preview_url;
+      audio.load();
+      beginPlayback(audio, options);
     },
-    [logPlayIfNew, stopAudio],
+    [beginPlayback, ensureAudioElement, logPlayIfNew],
   );
+
+  playAtIndexRef.current = playAtIndex;
 
   const startAudio = useCallback(
     (track: Track) => {
-      playAtIndex(
-        queueRef.current.findIndex((item) => item.id === track.id),
-        queueRef.current.length > 0 ? queueRef.current : [track],
-      );
+      const tracks = queueRef.current.length > 0 ? queueRef.current : [track];
+      const index = tracks.findIndex((item) => item.id === track.id);
+      playAtIndex(index >= 0 ? index : 0, tracks);
     },
     [playAtIndex],
   );
@@ -286,64 +382,59 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   );
 
   const resumePlayback = useCallback(() => {
-    if (!audioRef.current && currentTrack?.preview_url) {
+    const audio = audioRef.current;
+    if (!audio && currentTrack?.preview_url) {
       startAudio(currentTrack);
       return;
     }
-    if (!audioRef.current) {
+    if (!audio) {
       return;
     }
-    void audioRef.current.play().then(() => {
-      setIsPlaying(true);
-      setPlaybackBlocked(false);
-      playbackBridge.setPlaying(true);
-    }).catch((error) => {
-      if (isPlaybackBlockedError(error)) {
-        setPlaybackBlocked(true);
-      }
-    });
-  }, [currentTrack, startAudio]);
+    beginPlayback(audio);
+  }, [beginPlayback, currentTrack, startAudio]);
 
   const togglePlay = useCallback(() => {
     if (!currentTrack) {
       return;
     }
-    if (playbackBlocked || (!isPlaying && audioRef.current)) {
+    if (playbackBlocked || queueAdvancePending || (!isPlaying && audioRef.current)) {
       resumePlayback();
       return;
     }
     if (isPlaying && audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      playbackBridge.setPlaying(false);
+      pauseAudio();
       return;
     }
-    if (audioRef.current) {
-      void audioRef.current.play().then(() => {
-        setIsPlaying(true);
-        setPlaybackBlocked(false);
-        playbackBridge.setPlaying(true);
-      });
+    if (audioRef.current?.src) {
+      beginPlayback(audioRef.current);
       return;
     }
     startAudio(currentTrack);
-  }, [currentTrack, isPlaying, playbackBlocked, resumePlayback, startAudio]);
+  }, [
+    beginPlayback,
+    currentTrack,
+    isPlaying,
+    pauseAudio,
+    playbackBlocked,
+    queueAdvancePending,
+    resumePlayback,
+    startAudio,
+  ]);
 
   const pause = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    setIsPlaying(false);
-    playbackBridge.setPlaying(false);
-  }, []);
+    pauseAudio();
+  }, [pauseAudio]);
 
-  const playNext = useCallback((options?: PlayOptions): boolean => {
-    if (queueIndexRef.current < queueRef.current.length - 1) {
-      playAtIndex(queueIndexRef.current + 1, queueRef.current, options);
-      return true;
-    }
-    return false;
-  }, [playAtIndex]);
+  const playNext = useCallback(
+    (options?: PlayOptions): boolean => {
+      if (queueIndexRef.current < queueRef.current.length - 1) {
+        playAtIndex(queueIndexRef.current + 1, queueRef.current, options);
+        return true;
+      }
+      return false;
+    },
+    [playAtIndex],
+  );
 
   const playPrevious = useCallback(() => {
     if (audioRef.current && audioRef.current.currentTime > 3) {
@@ -356,26 +447,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, [playAtIndex]);
 
   const replayCurrentTrack = useCallback(() => {
-    if (!currentTrack) {
+    if (!currentTrack || !audioRef.current) {
+      if (currentTrack) {
+        startAudio(currentTrack);
+      }
       return;
     }
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      void audioRef.current.play().then(() => {
-        setIsPlaying(true);
-        setPlaybackBlocked(false);
-        playbackBridge.setPlaying(true);
-      }).catch((error) => {
-        setIsPlaying(false);
-        playbackBridge.setPlaying(false);
-        if (isPlaybackBlockedError(error)) {
-          setPlaybackBlocked(true);
-        }
-      });
-      return;
-    }
-    startAudio(currentTrack);
-  }, [currentTrack, startAudio]);
+    audioRef.current.currentTime = 0;
+    beginPlayback(audioRef.current);
+  }, [beginPlayback, currentTrack, startAudio]);
 
   const removeFromQueue = useCallback(
     (trackId: string) => {
@@ -428,6 +508,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const closePlayer = useCallback(() => {
     stopAudio();
     setPlaybackBlocked(false);
+    setQueueAdvancePending(false);
     setCurrentTrack(null);
     setQueue([]);
     setQueueIndex(0);
@@ -449,14 +530,6 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     }),
     [],
   );
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
-    };
-  }, []);
 
   const value = useMemo(
     () => ({
@@ -481,6 +554,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       closePlayer,
       isTrackPlaying,
       playbackBlocked,
+      queueAdvancePending,
       resumePlayback,
       getQueueSnapshot,
     }),
@@ -506,6 +580,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       closePlayer,
       isTrackPlaying,
       playbackBlocked,
+      queueAdvancePending,
       resumePlayback,
       getQueueSnapshot,
     ],
